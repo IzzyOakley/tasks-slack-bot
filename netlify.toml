@@ -1,0 +1,10 @@
+[build]
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+  included_files = ["src/**"]
+
+[dev]
+  framework = "#custom"
+  command = "echo 'Use netlify dev to test functions locally'"
