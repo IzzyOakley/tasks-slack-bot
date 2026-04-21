@@ -60,8 +60,9 @@ async function handleMessage(event) {
     }
   }
 
-  // Handle text messages
-  if (text && text.trim()) {
+  // Handle text messages — skip messages that start with a bot mention
+  // (those are handled exclusively by the app_mention event handler)
+  if (text && text.trim() && !text.trim().startsWith('<@')) {
     await processTextMessage(text, channel, ts, user, 'Slack message', `#${channel}`);
   }
 }
@@ -113,8 +114,11 @@ async function handleAppMention(event) {
       await processTextMessage(command.taskDescription || cleanText, channel, ts, user, 'Slack message', `#${channel}`);
       break;
     case 'help':
-    default:
       await postThreadReply(channel, ts, buildHelpMessage(), { mrkdwn: true });
+      break;
+    default:
+      // Not a recognized command — treat the text as a task list
+      await processTextMessage(cleanText, channel, ts, user, 'Slack message', `#${channel}`);
   }
 }
 
