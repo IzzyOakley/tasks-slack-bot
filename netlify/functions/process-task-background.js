@@ -20,6 +20,8 @@ exports.handler = async (event) => {
   }
 
   const slackEvent = payload.event;
+  console.log('EVENT:', JSON.stringify({ type: slackEvent?.type, subtype: slackEvent?.subtype, bot_id: slackEvent?.bot_id, has_text: !!slackEvent?.text, payload_type: payload?.type }));
+
   if (!slackEvent) return { statusCode: 200 };
 
   // Skip bot messages to prevent infinite loops
@@ -30,6 +32,8 @@ exports.handler = async (event) => {
       await handleAppMention(slackEvent);
     } else if (slackEvent.type === 'message' && !slackEvent.subtype) {
       await handleMessage(slackEvent);
+    } else {
+      console.log('UNHANDLED EVENT - not processing:', slackEvent.type, slackEvent.subtype);
     }
   } catch (err) {
     console.error('Background function error:', err);
