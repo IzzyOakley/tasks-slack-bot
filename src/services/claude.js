@@ -12,7 +12,7 @@ For each task, return a JSON array of objects with these fields:
 - description: string or null (additional context if available)
 - assigneeEmail: string or null (email address if clearly mentioned or strongly implied, otherwise null)
 - priority: "Urgent" | "High" | "Medium" | "Low" (infer from urgency language; default to "Medium")
-- category: one of ["Permits", "Subcontractors", "Materials", "Client", "Site", "Finance", "Admin", "Draws", "Proposals", "Lots", "Vendor Management"] — infer from context
+- category: one of ["Project Sub-contractors/vendors", "Active Clients", "Sales", "Office Procurement", "Accountant", "IT & Systems", "Real Estate Work", "Internal Team Collaboration"] — infer from context. Use "Project Sub-contractors/vendors" for anything involving subs, suppliers, or vendors. Use "Active Clients" for client-facing tasks. Use "Sales" for proposals and new business. Use "Office Procurement" for materials, orders, bids. Use "Accountant" for finance, invoices, draws, payments. Use "IT & Systems" for technology tasks. Use "Real Estate Work" for lot or property tasks. Use "Internal Team Collaboration" for anything internal.
 - projectName: string or null (project or address mentioned, e.g. "14 Oak St", "Henderson build")
 - dueDate: string or null (ISO 8601 date format if a deadline is mentioned, otherwise null)
 
