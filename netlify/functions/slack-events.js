@@ -57,7 +57,8 @@ exports.handler = async (event) => {
   }
 
   // Fire and forget — do NOT await
-  fetch(`${process.env.NETLIFY_SITE_URL}/.netlify/functions/process-task-background`, {
+  const siteUrl = (process.env.NETLIFY_SITE_URL || '').replace(/\/$/, '');
+  fetch(`${siteUrl}/.netlify/functions/process-task-background`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: event.body,
