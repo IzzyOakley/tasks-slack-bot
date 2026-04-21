@@ -6,7 +6,7 @@ Welcome to the Oakley Task Bot. This bot lives in Slack and automatically logs t
 
 ## Getting Started
 
-The bot works in any Slack channel it has been invited to. Ask Izzy to invite it to your channels.
+The bot works in any Slack channel or group DM it has been invited to. Anyone on the team can invite it by typing `/invite @TaskMate` in any channel or group DM.
 
 You'll know it's working when you post a message and it replies in the thread like this:
 
@@ -174,9 +174,9 @@ The bot logs everything to the **Operational Tasks** table in the **Team Collabo
 
 ## What the Bot Can't Do
 
-- **It cannot be added to a private 1:1 DM between two people.** This is a Slack limitation. If you need to log tasks from a conversation with someone, forward the messages to `#task-inbox` or ask Izzy to set up a group chat that includes the bot.
+- **It cannot be added to a private 1:1 DM between two people.** This is a Slack limitation. If you need to log tasks from a conversation with someone, forward the messages to `#task-inbox` or start a group DM that includes the bot.
 - **It won't create new projects in Airtable.** It can link tasks to existing projects but won't add new ones. If a task doesn't link to a project automatically, you can set it manually in Airtable.
-- **It won't catch tasks in channels it hasn't been invited to.** Ask Izzy to add it to any channel where work is being discussed.
+- **It won't catch tasks in channels it hasn't been invited to.** Anyone on the team can invite it by typing `/invite @TaskMate` in any channel or group DM.
 
 ---
 
