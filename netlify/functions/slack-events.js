@@ -25,6 +25,7 @@ function verifySlackSignature(signingSecret, requestBody, timestamp, slackSignat
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
+    console.log('SLACK-EVENTS: rejected non-POST');
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
 
@@ -33,10 +34,14 @@ exports.handler = async (event) => {
   const signingSecret = process.env.SLACK_SIGNING_SECRET;
 
   if (!timestamp || !slackSignature || !signingSecret) {
+    console.log('SLACK-EVENTS: missing headers', { timestamp: !!timestamp, slackSignature: !!slackSignature, signingSecret: !!signingSecret });
     return { statusCode: 400, body: 'Missing signature headers' };
   }
 
-  if (!verifySlackSignature(signingSecret, event.body, timestamp, slackSignature)) {
+  const valid = verifySlackSignature(signingSecret, event.body, timestamp, slackSignature);
+  console.log('SLACK-EVENTS: signature valid:', valid, '| timestamp age (s):', Math.floor(Date.now() / 1000) - parseInt(timestamp, 10));
+
+  if (!valid) {
     return { statusCode: 401, body: 'Invalid signature' };
   }
 
@@ -44,8 +49,11 @@ exports.handler = async (event) => {
   try {
     payload = JSON.parse(event.body);
   } catch {
+    console.log('SLACK-EVENTS: JSON parse failed');
     return { statusCode: 400, body: 'Invalid JSON' };
   }
+
+  console.log('SLACK-EVENTS: payload type:', payload.type, '| event type:', payload.event && payload.event.type);
 
   // Slack URL verification challenge
   if (payload.type === 'url_verification') {
@@ -58,7 +66,9 @@ exports.handler = async (event) => {
 
   // Fire and forget — do NOT await
   const siteUrl = (process.env.NETLIFY_SITE_URL || '').replace(/\/$/, '');
-  fetch(`${siteUrl}/.netlify/functions/process-task-background`, {
+  const bgUrl = `${siteUrl}/.netlify/functions/process-task-background`;
+  console.log('SLACK-EVENTS: firing background function:', bgUrl);
+  fetch(bgUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: event.body,
