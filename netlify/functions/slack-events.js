@@ -64,15 +64,22 @@ exports.handler = async (event) => {
     };
   }
 
-  // Fire and forget — do NOT await
+  // Await the fetch — background functions return 202 immediately so this
+  // resolves in milliseconds, well within Slack's 3-second window.
+  // Fire-and-forget was unreliable: the process terminated before the TCP
+  // connection was established, causing intermittent missed events.
   const siteUrl = (process.env.NETLIFY_SITE_URL || '').replace(/\/$/, '');
   const bgUrl = `${siteUrl}/.netlify/functions/process-task-background`;
-  console.log('SLACK-EVENTS: firing background function:', bgUrl);
-  fetch(bgUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: event.body,
-  }).catch((err) => console.error('Failed to trigger background function:', err));
+  console.log('SLACK-EVENTS: triggering background function:', bgUrl);
+  try {
+    await fetch(bgUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: event.body,
+    });
+  } catch (err) {
+    console.error('Failed to trigger background function:', err);
+  }
 
   return { statusCode: 200, body: '' };
 };
