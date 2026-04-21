@@ -52,6 +52,22 @@ async function joinChannel(channelId) {
   }
 }
 
+async function openDirectMessage(userId) {
+  const client = getClient();
+  const result = await client.conversations.open({ users: userId });
+  return result.channel.id;
+}
+
+async function getUserIdByEmail(email) {
+  const client = getClient();
+  try {
+    const result = await client.users.lookupByEmail({ email });
+    return result.user ? result.user.id : null;
+  } catch {
+    return null;
+  }
+}
+
 async function getChannelIdByName(channelName) {
   const client = getClient();
   const name = channelName.replace(/^#/, '');
@@ -77,4 +93,6 @@ module.exports = {
   getUserInfo,
   joinChannel,
   getChannelIdByName,
+  openDirectMessage,
+  getUserIdByEmail,
 };
