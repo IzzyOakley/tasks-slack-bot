@@ -1,8 +1,8 @@
-# Oakley Task Bot — Technical Documentation
+# TaskMate - Technical Documentation
 
 ## Overview
 
-The Oakley Task Bot is a Claude-powered Slack bot deployed on Netlify that automatically extracts tasks from Slack messages and handwritten note photos, logs them to Airtable, and supports conversational task management. It is built for a small construction team and designed to scale to the full Oakley Home Builders workforce.
+TaskMate is a Claude-powered Slack bot deployed on Netlify that automatically extracts tasks from Slack messages and handwritten note photos, logs them to Airtable, and supports conversational task management. It is built for the Oakley Home Builders team and designed to scale to the full workforce.
 
 ---
 
@@ -12,31 +12,37 @@ The Oakley Task Bot is a Claude-powered Slack bot deployed on Netlify that autom
 
 ```
 Slack Message
-     │
-     ▼
-slack-events.js          ← Netlify Serverless Function
+     |
+     v
+slack-events.js          <- Netlify Serverless Function
 (verify signature,        (must respond within 3 seconds)
  ack Slack, fire-and-forget)
-     │
-     ▼ (async POST, no await)
-process-task-background.js  ← Netlify Background Function
+     |
+     v (async POST, no await)
+process-task-background.js  <- Netlify Background Function
 (AI processing,               (up to 15 minutes runtime)
  Airtable writes,
  Slack thread reply)
-     │
-     ├── src/services/claude.js      (Anthropic API)
-     ├── src/services/airtable.js    (Airtable API)
-     ├── src/services/slack.js       (Slack Web API)
-     ├── src/utils/userMap.js        (Slack → email resolution)
-     └── src/utils/taskParser.js     (project matching, Block Kit)
+     |
+     +-- src/services/claude.js      (Anthropic API)
+     +-- src/services/airtable.js    (Airtable API)
+     +-- src/services/slack.js       (Slack Web API)
+     +-- src/utils/userMap.js        (Slack -> email resolution)
+     +-- src/utils/taskParser.js     (project matching, Block Kit)
+
+morning-digest.js  <- Netlify Scheduled Function
+(runs weekdays at 8 AM EST)
+     |
+     +-- Personal DM to each assignee (Mon-Fri)
+     +-- Group channel overview (Mondays only)
 ```
 
 ### Why Two Functions?
 
 Slack requires a `200 OK` HTTP response within **3 seconds** or it marks the delivery as failed. AI processing and Airtable writes take longer than that. The solution is a two-function pattern:
 
-- `slack-events.js` — verifies the request, acknowledges Slack immediately, then fires an async POST to the background function without awaiting it
-- `process-task-background.js` — receives the full payload, does all the work, posts results back to Slack via the Web API
+- `slack-events.js` - verifies the request, acknowledges Slack immediately, then fires an async POST to the background function without awaiting it
+- `process-task-background.js` - receives the full payload, does all the work, posts results back to Slack via the Web API
 
 Netlify Background Functions support runtimes up to 15 minutes, which is more than enough for vision processing and bulk scans.
 
@@ -46,27 +52,27 @@ Netlify Background Functions support runtimes up to 15 minutes, which is more th
 
 ```
 /
-├── netlify/
-│   └── functions/
-│       ├── slack-events.js              # Fast ack only — <3s
-│       ├── process-task-background.js   # All logic — up to 15min
-│       └── morning-digest.js            # Scheduled weekday digest
-├── src/
-│   ├── services/
-│   │   ├── claude.js                    # All Anthropic API calls
-│   │   ├── airtable.js                  # All Airtable CRUD
-│   │   └── slack.js                     # Slack Web API helpers
-│   └── utils/
-│       ├── userMap.js                   # Slack user ID → email
-│       └── taskParser.js                # Project matching, formatting
-├── docs/
-│   ├── technical-documentation.md
-│   └── user-manual.md
-├── .env.example
-├── .gitignore
-├── netlify.toml
-├── package.json
-└── README.md
++-- netlify/
+|   +-- functions/
+|       +-- slack-events.js              # Fast ack only - <3s
+|       +-- process-task-background.js   # All logic - up to 15min
+|       +-- morning-digest.js            # Scheduled weekday digest + DMs
++-- src/
+|   +-- services/
+|   |   +-- claude.js                    # All Anthropic API calls
+|   |   +-- airtable.js                  # All Airtable CRUD
+|   |   +-- slack.js                     # Slack Web API helpers
+|   +-- utils/
+|       +-- userMap.js                   # Slack user ID -> email
+|       +-- taskParser.js                # Project matching, formatting
++-- docs/
+|   +-- technical-documentation.md
+|   +-- user-manual.md
++-- .env.example
++-- .gitignore
++-- netlify.toml
++-- package.json
++-- README.md
 ```
 
 ---
@@ -76,10 +82,10 @@ Netlify Background Functions support runtimes up to 15 minutes, which is more th
 | Layer | Technology | Version |
 |---|---|---|
 | Runtime | Node.js | 18+ |
-| Hosting | Netlify Serverless + Background Functions | — |
+| Hosting | Netlify Serverless + Background Functions | - |
 | Slack SDK | @slack/bolt, @slack/web-api | latest |
 | AI | Anthropic SDK (@anthropic-ai/sdk) | latest |
-| AI Model | claude-opus-4-6 | — |
+| AI Model | claude-opus-4-6 | - |
 | Task Database | Airtable via `airtable` npm package | latest |
 | HTTP | node-fetch | ^2.6.9 |
 
@@ -91,15 +97,15 @@ All functions use CommonJS (`require`) for Netlify esbuild compatibility.
 
 | Variable | Description | Where to get it |
 |---|---|---|
-| `SLACK_BOT_TOKEN` | Bot OAuth token (xoxb-...) | Slack App → OAuth & Permissions |
-| `SLACK_SIGNING_SECRET` | Request signing secret | Slack App → Basic Information |
+| `SLACK_BOT_TOKEN` | Bot OAuth token (xoxb-...) | Slack App - OAuth & Permissions |
+| `SLACK_SIGNING_SECRET` | Request signing secret | Slack App - Basic Information |
 | `ANTHROPIC_API_KEY` | Anthropic API key (sk-ant-...) | console.anthropic.com |
 | `AIRTABLE_API_KEY` | Personal Access Token (pat...) | airtable.com/create/tokens |
 | `AIRTABLE_BASE_ID` | Base ID (app...) | Base URL in Airtable |
-| `DIGEST_CHANNEL_ID` | Slack channel ID for digest | Right-click channel → Copy link |
+| `DIGEST_CHANNEL_ID` | Slack channel ID for Monday group digest | Right-click channel - Copy link |
 | `NETLIFY_SITE_URL` | Full deployed URL | Netlify dashboard |
 
-Set all variables in **Netlify → Site configuration → Environment variables** for production. For local dev, copy `.env.example` to `.env` and fill in values.
+Set all variables in **Netlify - Site configuration - Environment variables** for production. For local dev, copy `.env.example` to `.env` and fill in values.
 
 ---
 
@@ -126,18 +132,18 @@ Set all variables in **Netlify → Site configuration → Environment variables*
 **Entry point**: Parses the Slack event, routes to the correct handler, handles errors, posts failure messages to Slack if something goes wrong.
 
 **Event routing**:
-- `app_mention` → `handleAppMention()` — parses commands via Claude
-- `message` (no subtype) → `handleMessage()` — checks for images first, then text
+- `app_mention` - `handleAppMention()` - parses commands via Claude
+- `message` (no subtype, does not start with a bot mention) - `handleMessage()` - checks for images first, then text
 
-**Bot loop prevention**: Checks `event.bot_id` and `event.subtype === 'bot_message'` and exits immediately for bot-originated messages.
+**Bot loop prevention**: Checks `event.bot_id` and `event.subtype === 'bot_message'` and exits immediately for bot-originated messages. Also skips `message` events whose text starts with `<@` to prevent double-processing of mentions.
 
 **Key internal functions**:
 
 | Function | Purpose |
 |---|---|
 | `handleMessage` | Routes to image or text handler |
-| `handleAppMention` | Parses `@bot` commands via Claude |
-| `processTextMessage` | Extracts tasks from text, writes to Airtable, replies |
+| `handleAppMention` | Parses `@TaskMate` commands via Claude; falls back to task extraction for unrecognized input |
+| `processTextMessage` | Extracts tasks from text, writes to Airtable, replies in thread |
 | `processImageFiles` | Downloads image, sends to Claude vision, writes to Airtable |
 | `logTasksToAirtable` | Iterates Claude output, resolves projects, creates records |
 | `handleShowTasks` | Fetches tasks for a specific user, formats with Block Kit |
@@ -154,9 +160,13 @@ Set all variables in **Netlify → Site configuration → Environment variables*
 
 **Type**: Scheduled Function
 
-**Schedule**: `0 13 * * 1-5` — 1:00 PM UTC = 8:00 AM EST / 9:00 AM EDT, Monday–Friday
+**Schedule**: `0 13 * * 1-5` - 1:00 PM UTC = 8:00 AM EST / 9:00 AM EDT, Monday through Friday
 
-**Uses**: `@netlify/functions` schedule wrapper. Fetches all open tasks (`To Do` + `In Progress`), groups by assignee, sorts by priority, posts Block Kit formatted digest to `DIGEST_CHANNEL_ID`.
+**Behavior**:
+- **Every weekday (Mon-Fri)**: Fetches all open tasks, groups by assignee, and sends each person a personal DM with their own tasks sorted by priority
+- **Mondays only**: Also posts a full team overview to the channel set in `DIGEST_CHANNEL_ID`, showing all open tasks grouped by assignee
+
+**DM flow**: For each assignee email found in open tasks, looks up their Slack user ID via `users.lookupByEmail`, opens a DM channel via `conversations.open`, and posts their task list.
 
 ---
 
@@ -179,7 +189,7 @@ All calls use model `claude-opus-4-6`.
 - Max tokens: 2000
 
 **`parseCommand(text, userEmail)`**
-- Determines user's intent from a `@bot` mention
+- Determines user intent from a `@TaskMate` mention
 - Returns `{ intent, targetUser, taskDescription, priority, channel }`
 - Max tokens: 500
 
@@ -190,7 +200,7 @@ All calls use model `claude-opus-4-6`.
   "description": "string | null",
   "assigneeEmail": "string | null",
   "priority": "Urgent | High | Medium | Low",
-  "category": "Permits | Subcontractors | Materials | ...",
+  "category": "Project Sub-contractors/vendors | Active Clients | Sales | Office Procurement | Accountant | IT & Systems | Real Estate Work | Internal Team Collaboration",
   "projectName": "string | null",
   "dueDate": "ISO 8601 string | null"
 }
@@ -232,6 +242,8 @@ Thin wrapper around `@slack/web-api` WebClient.
 | `getUserInfo(userId)` | Get full user object |
 | `joinChannel(channelId)` | Join a channel (needed for scan) |
 | `getChannelIdByName(channelName)` | Paginate conversations.list to find ID by name |
+| `openDirectMessage(userId)` | Open a DM channel with a user, returns channel ID |
+| `getUserIdByEmail(email)` | Look up a Slack user ID by email address |
 
 ---
 
@@ -239,11 +251,11 @@ Thin wrapper around `@slack/web-api` WebClient.
 
 Resolves Slack user identities to email addresses for Airtable.
 
-- **`resolveUserEmail(slackUserId)`** — calls `users.info`, caches result in memory
-- **`resolveUserByDisplayName(displayName)`** — paginates `users.list`, matches on real_name / name / display_name
-- **`resolveUserByEmail(email)`** — calls `users.lookupByEmail`
+- **`resolveUserEmail(slackUserId)`** - calls `users.info`, caches result in memory
+- **`resolveUserByDisplayName(displayName)`** - paginates `users.list`, matches on real_name / name / display_name
+- **`resolveUserByEmail(email)`** - calls `users.lookupByEmail`
 
-Cache is in-process memory — lives for the duration of the function invocation only.
+Cache is in-process memory - lives for the duration of the function invocation only.
 
 ---
 
@@ -251,11 +263,11 @@ Cache is in-process memory — lives for the duration of the function invocation
 
 Shared formatting and matching utilities.
 
-- **`matchProject(projectName)`** — fetches and caches projects from Airtable, normalizes names, returns record ID or null
-- **`groupTasksByPriority(tasks)`** — groups into `{ Urgent, High, Medium, Low }`
-- **`groupTasksByAssignee(tasks)`** — groups by assignee email
-- **`buildPriorityBlocks(tasks, header)`** — returns Slack Block Kit block array
-- **`formatPriorityEmoji(priority)`** — returns 🔴/🟠/🟡/⚪
+- **`matchProject(projectName)`** - fetches and caches projects from Airtable, normalizes names, returns record ID or null
+- **`groupTasksByPriority(tasks)`** - groups into `{ Urgent, High, Medium, Low }`
+- **`groupTasksByAssignee(tasks)`** - groups by assignee email
+- **`buildPriorityBlocks(tasks, header)`** - returns Slack Block Kit block array
+- **`formatPriorityEmoji(priority)`** - returns the priority color emoji
 
 ---
 
@@ -270,12 +282,12 @@ Shared formatting and matching utilities.
 | Assignee | Collaborator | Set via `{ email }` |
 | Status | Single select | To Do / In Progress / Blocked / Done |
 | Priority | Single select | Urgent / High / Medium / Low |
-| Project | Linked record → Projects | Set via record ID array |
-| Category | Single select | Permits / Subcontractors / Materials / Client / Site / Finance / Admin / Draws / Proposals / Lots / Vendor Management |
+| Project | Linked record - Projects | Set via record ID array |
+| Category | Single select | Project Sub-contractors/vendors / Active Clients / Sales / Office Procurement / Accountant / IT & Systems / Real Estate Work / Internal Team Collaboration |
 | Source | Single select | Slack message / Handwritten note / Email / Verbal |
 | Source Detail | Single line text | Channel name or context |
 | Due Date | Date | ISO format |
-| Date Created | Formula | **Never write to this field** |
+| Date Created | Formula | Never write to this field |
 | Date Completed | Date | Set when Status = Done |
 | Raw Input | Long text | Original message text |
 | Bot Created | Checkbox | Always true for bot records |
@@ -309,6 +321,7 @@ im:read
 im:write
 mpim:history
 mpim:read
+mpim:write
 users:read
 users:read.email
 ```
@@ -333,9 +346,9 @@ app_mention
 - All Claude and Airtable calls are wrapped in `try/catch`
 - Claude JSON parse failures trigger one automatic retry
 - Airtable 422 errors (field validation) log the full payload to console
-- Any unhandled error in the background function posts a user-facing message:
-  `⚠️ Something went wrong logging that task. Please try again or log it manually in Airtable.`
-- All errors are logged via `console.error()` — visible in Netlify function logs
+- Any unhandled error in the background function posts a user-facing message to Slack
+- All errors are logged via `console.error()` - visible in Netlify function logs
+- DM failures (user not found, DM blocked) are logged but do not halt the digest for other users
 
 ---
 
@@ -344,7 +357,7 @@ app_mention
 - Slack request signatures are verified on every inbound request using HMAC-SHA256
 - Requests older than 5 minutes are rejected to prevent replay attacks
 - `crypto.timingSafeEqual` is used to prevent timing-based signature attacks
-- No credentials are hardcoded anywhere — all secrets are injected via environment variables
+- No credentials are hardcoded anywhere - all secrets are injected via environment variables
 - `.env` is gitignored and never committed
 
 ---
@@ -372,13 +385,14 @@ ngrok http 8888
 - Host: Netlify (connected to GitHub repo, auto-deploys on push to `main`)
 - Live URL: https://optasks.netlify.app
 
-To deploy changes: push to `main` branch — Netlify auto-deploys.
+To deploy changes: push to `main` branch - Netlify auto-deploys.
 
 ---
 
 ## Known Limitations
 
-- **1:1 DMs**: Slack does not allow bots to be added to private 1:1 DMs. Users must use `#task-inbox` or a group DM.
+- **1:1 DMs**: Slack does not allow bots to be added to private 1:1 DMs. Users must use a group DM or forward messages to a monitored channel.
 - **Project auto-creation**: The bot matches task project names to existing Airtable Projects but will not create new Project records automatically.
 - **User cache**: The in-memory user cache resets on each function invocation. There is no persistent cross-invocation cache.
 - **Task fuzzy match**: `findTaskByName` uses simple substring matching. Ambiguous task names may match the wrong record.
+- **DM delivery**: Personal DMs require the assignee's Airtable email to match their Slack account email. Mismatches will be logged and skipped.
