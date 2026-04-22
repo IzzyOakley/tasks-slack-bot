@@ -1,5 +1,5 @@
 {
-  "name": "oakley-slack-bot",
+  "name": "oakley-taskmate-bot",
   "version": "1.0.0",
   "description": "Claude-powered Slack bot for Oakley Home Builders task management",
   "main": "index.js",

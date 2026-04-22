@@ -1,17 +1,24 @@
-# Oakley Home Builders — Claude Task Bot
+# TaskMate — Oakley Home Builders Task Bot
 
-A Claude-powered Slack bot that extracts tasks from messages and photos and logs them automatically to Airtable. Built for Netlify serverless deployment.
+A Claude-powered Slack bot that extracts tasks from messages and photos, logs them to Airtable, and keeps the whole team organized through three interaction layers: personal DMs, a central team channel, and personal oversight channels.
 
 ---
 
 ## Overview
 
-Post a message or photo to any channel the bot is in and it will:
-- Extract every actionable task using Claude AI
-- Log each task as a separate record in the **Operational Tasks** Airtable table
-- Reply in thread confirming what was logged
+TaskMate operates across three layers:
 
-You can also mention the bot directly to view tasks, mark things done, change priorities, scan channels for tasks, and more.
+**Layer 1 - Personal DMs**
+Each team member can DM TaskMate directly. The bot sends a daily morning digest of your open tasks, and you can manage your list conversationally (mark done, change priority, add tasks, view list).
+
+**Layer 2 - Central channel (`#oakley-operational-tasks`)**
+Post a message or photo and TaskMate extracts every actionable task, logs them to Airtable, and replies in-thread. Monday morning and Friday afternoon digests are posted here for the whole team.
+
+**Layer 3 - Personal oversight channels (`#dan-tasks`, `#izzy-tasks`, etc.)**
+Steve can view and manage each person's task list from their dedicated channel. Weekly digests are also posted here per person. Anyone can invite TaskMate to a personal channel by following the naming convention `#[firstname]-tasks`.
+
+**Steve's role**
+Steve (`steve@oakleyhomebuilders.com`) is oversight-only. He is never assigned tasks in Airtable. When Steve messages in a team channel, TaskMate interprets his messages as management commands (reprioritize, reassign, set deadlines). When Steve DMs TaskMate, he is redirected to the personal channels.
 
 ---
 
@@ -28,9 +35,9 @@ You can also mention the bot directly to view tasks, mark things done, change pr
 
 ## Slack App Setup
 
-1. Go to [api.slack.com/apps](https://api.slack.com/apps) and click **Create New App → From scratch**
-2. Name it (e.g. "Oakley Task Bot") and select your workspace
-3. Under **OAuth & Permissions → Bot Token Scopes**, add all of the following scopes:
+1. Go to [api.slack.com/apps](https://api.slack.com/apps) and click **Create New App - From scratch**
+2. Name it **TaskMate** and select your workspace
+3. Under **OAuth & Permissions - Bot Token Scopes**, add all of the following scopes:
 
 ```
 app_mentions:read
@@ -45,24 +52,26 @@ im:read
 im:write
 mpim:history
 mpim:read
+mpim:write
 users:read
 users:read.email
 ```
 
 4. Click **Install to Workspace** and copy the **Bot User OAuth Token** (starts with `xoxb-`)
 5. Under **Basic Information**, copy the **Signing Secret**
-6. Under **Event Subscriptions**, toggle **Enable Events** ON
+6. Under **App Home**, go to the **Messages Tab** section and enable **Allow users to send Slash commands and messages from the messages tab** — this is required for DMs to work
+7. Under **Event Subscriptions**, toggle **Enable Events** ON
    - Set the **Request URL** to: `https://YOUR-NETLIFY-URL/.netlify/functions/slack-events`
-   - Wait for Netlify to be deployed first, then paste the URL — Slack will verify it
-7. Under **Subscribe to bot events**, add:
+   - Deploy Netlify first, then paste the URL — Slack will verify it
+8. Under **Subscribe to bot events**, add:
    ```
+   app_mention
    message.channels
    message.groups
    message.im
    message.mpim
-   app_mention
    ```
-8. Click **Save Changes** and reinstall the app if prompted
+9. Click **Save Changes** and reinstall the app if prompted
 
 ---
 
@@ -77,9 +86,29 @@ users:read.email
 4. Under **Access**, select your specific base
 5. Copy the token (starts with `pat...`)
 
-Your Airtable base must have:
-- A table named **"Operational Tasks"** with the fields described in the schema (see project documentation)
-- A table named **"Projects"** with at least a **Project** (single line text) field
+Your Airtable base must have a table named **"Operational Tasks"** with these fields:
+
+| Field | Type |
+|---|---|
+| Task Name | Single line text |
+| Assignee | Email |
+| Priority | Single select (Urgent, High, Medium, Low) |
+| Status | Single select (Open, In Progress, Done) |
+| Category | Single select (see values below) |
+| Project | Linked record to Projects table |
+| Notes | Long text |
+| Due Date | Date |
+| Date Completed | Date |
+
+**Category values** (must match exactly):
+- Project Sub-contractors/vendors
+- Active Clients
+- Sales
+- Office Procurement
+- Accountant
+- IT & Systems
+- Real Estate Work
+- Internal Team Collaboration
 
 ---
 
@@ -94,96 +123,109 @@ Copy `.env.example` to `.env` and fill in all values:
 | `ANTHROPIC_API_KEY` | Anthropic API key (sk-ant-...) |
 | `AIRTABLE_API_KEY` | Airtable Personal Access Token (pat...) |
 | `AIRTABLE_BASE_ID` | Airtable base ID (app...) |
-| `DIGEST_CHANNEL_ID` | Slack channel ID for the morning digest (C0XXXXXXXX) |
-| `NETLIFY_SITE_URL` | Full deployed URL, e.g. `https://your-site.netlify.app` |
+| `CENTRAL_CHANNEL_ID` | Slack channel ID for `#oakley-operational-tasks` |
+| `NETLIFY_SITE_URL` | Full deployed URL, no trailing slash: `https://your-site.netlify.app` |
+| `STEVE_EMAIL` | Steve's email address (default: `steve@oakleyhomebuilders.com`) |
 
-**To find a Slack channel ID**: Right-click the channel → Copy link → the ID is the last path segment (e.g. `C0XXXXXXXX`).
+**To find a Slack channel ID**: Right-click the channel in Slack - Copy link - the ID is the last path segment (e.g. `C0XXXXXXXX`).
+
+**Important**: Do not include a trailing slash in `NETLIFY_SITE_URL`.
 
 ---
 
 ## Netlify Deployment
 
 1. Push this repo to GitHub
-2. Log in to [app.netlify.com](https://app.netlify.com) → **Add new site → Import an existing project**
+2. Log in to [app.netlify.com](https://app.netlify.com) - **Add new site - Import an existing project**
 3. Connect your GitHub repo
-4. Under **Site configuration → Environment variables**, add all variables from `.env`
+4. Under **Site configuration - Environment variables**, add all variables listed above
 5. Deploy — Netlify will auto-detect `netlify.toml`
 
 After deploy, copy your Netlify site URL and:
-- Set `NETLIFY_SITE_URL` in Netlify environment variables
+- Set `NETLIFY_SITE_URL` in Netlify environment variables (no trailing slash)
 - Paste `https://YOUR-NETLIFY-URL/.netlify/functions/slack-events` into Slack's Event Subscriptions Request URL
 
 ---
 
-## Local Development
+## Inviting the Bot
 
-```bash
-npm install
-cp .env.example .env
-# fill in .env values
-netlify dev
-```
+Any team member can invite TaskMate to a channel:
 
-Netlify Dev runs your functions locally. Use [ngrok](https://ngrok.com) to expose a public URL for Slack webhook testing:
+1. Open any channel in Slack
+2. Type `/invite @TaskMate`
 
-```bash
-ngrok http 8888
-# Then set your Slack Event Subscriptions URL to: https://xxxx.ngrok.io/.netlify/functions/slack-events
-```
+**Personal oversight channels**: Create a channel named `#[firstname]-tasks` (e.g. `#dan-tasks`, `#izzy-tasks`) and invite TaskMate. The bot will automatically recognize it as a personal channel and route digests and Steve's management commands there.
+
+**DMs**: Click TaskMate's name in the sidebar and start messaging. Make sure the Messages Tab is enabled in the Slack App Home settings (see setup step 6 above).
 
 ---
 
-## Inviting the Bot to Channels
+## Command Reference
 
-1. In Slack, open any channel
-2. Type `/invite @OakleyTaskBot` (use your bot's name)
-3. The bot will now monitor and respond to messages in that channel
+### Personal DM commands (message TaskMate directly)
 
-**Group DMs**: You can add the bot to a group DM (3+ people) the same way.
-
-**1:1 DMs**: Slack does not allow bots to be added to private 1:1 DMs between two humans. To log tasks from a 1:1 conversation, either:
-- Forward the messages to `#task-inbox`
-- Start a group DM that includes the bot
-
----
-
-## Using the Bot
-
-### Automatic task extraction
-
-Just post a message in any channel the bot is in — it will extract tasks automatically.
-
-| Action | What happens |
+| What you type | What happens |
 |---|---|
-| Post a text message | Claude extracts tasks, logs to Airtable, replies in thread |
-| Upload a photo of handwritten notes | Claude reads the image, extracts tasks, logs to Airtable |
+| `what's my list` | Show your open tasks, sorted by priority |
+| `show my tasks` | Same as above |
+| `show urgent tasks` | Show only Urgent priority tasks |
+| `show completed` | Show tasks you completed this week |
+| `mark [task] as done` | Mark a task complete |
+| `set [task] to high priority` | Change a task's priority |
+| `assign [task] to Dan` | Reassign a task to someone else |
+| `add task: [description]` | Create a task immediately |
+| Any task list or note | TaskMate extracts and logs tasks automatically |
 
-### Mention commands
+### Central channel commands (in `#oakley-operational-tasks`)
 
-| Command | Action |
+| What you type | What happens |
 |---|---|
-| `@bot what's my list` | Show your open tasks, sorted by priority |
-| `@bot show my tasks` | Same as above |
-| `@bot what's Dan working on` | Show Dan's open tasks |
-| `@bot show all open tasks` | All open tasks, grouped by assignee |
-| `@bot mark [task] as done` | Mark a task complete (set Status = Done) |
-| `@bot set [task] to high priority` | Change task priority |
-| `@bot assign [task] to Dan` | Reassign a task |
-| `@bot add task: [description]` | Create a task immediately |
-| `@bot scan #channel-name` | Scan last 100 messages in a channel for tasks |
-| `@bot scan this channel` | Scan the current channel |
-| `@bot scan my recent messages` | Scan your recent messages in this channel |
-| `@bot help` | Show this command reference |
+| `@TaskMate what's my list` | Show your open tasks |
+| `@TaskMate show Dan's tasks` | Show Dan's open tasks |
+| `@TaskMate show all open tasks` | All open tasks grouped by assignee |
+| `@TaskMate show completed` | Tasks completed this week |
+| `@TaskMate mark [task] as done` | Mark a task complete |
+| `@TaskMate set [task] to urgent` | Change priority |
+| `@TaskMate assign [task] to Dan` | Reassign a task |
+| `@TaskMate help` | Show command reference |
+| Post any message or photo | Tasks are extracted and logged automatically |
+
+### Steve's management commands (in any channel or personal channel)
+
+Steve's messages are interpreted as management instructions, not task creation:
+
+| What Steve types | What happens |
+|---|---|
+| `set [task] to urgent` | Changes that task's priority |
+| `reassign [task] to Dan` | Reassigns the task |
+| `set deadline for [task] to Friday` | Sets a due date |
+| `mark [task] as done` | Marks the task complete |
 
 ---
 
-## Morning Digest
+## Personal Channel Setup
 
-The bot posts a daily task digest every weekday at **8:00 AM EST / 9:00 AM EDT** to the channel set in `DIGEST_CHANNEL_ID`.
+To set up a personal task channel for a team member:
 
-The digest shows all open tasks grouped by assignee and sorted by priority (Urgent → High → Medium → Low).
+1. Create a Slack channel named `#[firstname]-tasks` (e.g. `#dan-tasks`)
+2. Invite the team member and invite `@TaskMate`
+3. That's it — TaskMate will automatically detect the channel and route that person's weekly digests there
 
-**To change the channel**: Update the `DIGEST_CHANNEL_ID` environment variable in Netlify and redeploy.
+Steve can manage that person's tasks directly from their personal channel.
+
+---
+
+## Weekly Digest Schedule
+
+| Digest | When | Where |
+|---|---|---|
+| Morning digest (personal DM) | Weekdays at 8:00 AM EST | Each person's DM with TaskMate |
+| Monday overview | Monday at 8:00 AM EST | `#oakley-operational-tasks` + each `#[name]-tasks` channel |
+| Friday summary | Friday at 5:00 PM EDT | `#oakley-operational-tasks` + each `#[name]-tasks` channel |
+
+**Monday digest** shows all open tasks grouped by person and sorted by priority.
+
+**Friday digest** shows what was completed during the week and what is still open.
 
 ---
 
@@ -191,30 +233,33 @@ The digest shows all open tasks grouped by assignee and sorted by priority (Urge
 
 ### View function logs
 
-In Netlify: **Site → Functions → click a function → Logs**
-
-Or use the Netlify CLI:
-```bash
-netlify functions:log process-task-background
-netlify functions:log slack-events
-```
+In Netlify: **Site - Functions - click a function - Logs**
 
 ### Common issues
 
 **Slack says "Your URL didn't respond with the value of the `challenge` parameter"**
-→ Make sure your Netlify site is deployed and `slack-events.js` is live before setting the Request URL in Slack.
+- Make sure your Netlify site is deployed before setting the Request URL in Slack.
 
 **Tasks are not appearing in Airtable**
-→ Check function logs for errors. Verify your `AIRTABLE_API_KEY` has `data.records:write` scope and the correct base is selected. Make sure the field names in Airtable exactly match the schema.
+- Check function logs for errors. Verify `AIRTABLE_API_KEY` has `data.records:write` scope and the correct base is selected. Make sure field names in Airtable exactly match the schema.
 
-**Bot responds with "⚠️ Something went wrong"**
-→ Check the `process-task-background` function logs for the specific error.
-
-**Image processing not working**
-→ Ensure the bot has `files:read` scope and was reinstalled after adding it. Check that image files are jpg, jpeg, png, heic, or webp.
+**DMs to TaskMate are not working**
+- Under Slack App Home, enable the Messages Tab and make sure **Allow users to send Slash commands and messages from the messages tab** is turned on.
 
 **Morning digest not posting**
-→ Verify `DIGEST_CHANNEL_ID` is set. Make sure the bot has been invited to that channel. Check `morning-digest` function logs.
+- Verify the bot has been DMed at least once by each team member (Slack requires the user to initiate). Check `morning-digest` function logs.
 
-**"Bot cannot be added to 1:1 DMs" error**
-→ This is a Slack platform limitation. Use `#task-inbox` or a group DM instead.
+**Monday or Friday digest not posting to central channel**
+- Verify `CENTRAL_CHANNEL_ID` is set correctly and TaskMate has been invited to `#oakley-operational-tasks`.
+
+**Personal channel digests not posting**
+- Make sure the channel is named exactly `#[firstname]-tasks` (lowercase, no spaces). TaskMate must be invited to the channel.
+
+**Bot responds with "Something went wrong"**
+- Check the `process-task-background` function logs for the specific error.
+
+**Image processing not working**
+- Ensure the bot has `files:read` scope and was reinstalled after adding it. Supported formats: jpg, jpeg, png, heic, webp.
+
+**Steve's messages are being logged as tasks**
+- Verify `STEVE_EMAIL` environment variable is set correctly in Netlify.

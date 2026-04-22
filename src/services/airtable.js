@@ -7,7 +7,6 @@ const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process
 const TASKS_TABLE = 'Operational Tasks';
 const PROJECTS_TABLE = 'Projects';
 
-// Priority sort order for display
 const PRIORITY_ORDER = { Urgent: 0, High: 1, Medium: 2, Low: 3 };
 
 async function createTask(fields) {
@@ -34,6 +33,7 @@ async function updateTask(recordId, fields) {
   if (fields.priority !== undefined) updatePayload['Priority'] = fields.priority;
   if (fields.assigneeEmail !== undefined) updatePayload['Assignee'] = { email: fields.assigneeEmail };
   if (fields.dateCompleted !== undefined) updatePayload['Date Completed'] = fields.dateCompleted;
+  if (fields.dueDate !== undefined) updatePayload['Due Date'] = fields.dueDate;
 
   const record = await base(TASKS_TABLE).update(recordId, updatePayload);
   return record;
@@ -43,7 +43,6 @@ async function getTasksByAssignee(assigneeEmail) {
   const records = await base(TASKS_TABLE)
     .select({
       filterByFormula: `AND({Assignee} = "${assigneeEmail}", {Status} != "Done")`,
-      sort: [{ field: 'Priority', direction: 'asc' }],
     })
     .all();
 
@@ -51,7 +50,6 @@ async function getTasksByAssignee(assigneeEmail) {
 }
 
 async function getTasksByName(assigneeName) {
-  // Search by partial name match when we only have a display name
   const records = await base(TASKS_TABLE)
     .select({
       filterByFormula: `AND(FIND("${assigneeName.toLowerCase()}", LOWER({Assignee})) > 0, {Status} != "Done")`,
@@ -71,6 +69,23 @@ async function getAllOpenTasks() {
   return records.map(formatTaskRecord).sort(sortByPriority);
 }
 
+async function getCompletedThisWeek(assigneeEmail) {
+  const mondayStr = getMondayOfCurrentWeek();
+  const filter = assigneeEmail
+    ? `AND({Assignee} = "${assigneeEmail}", IS_AFTER({Date Completed}, "${mondayStr}"), {Status} = "Done")`
+    : `AND(IS_AFTER({Date Completed}, "${mondayStr}"), {Status} = "Done")`;
+
+  const records = await base(TASKS_TABLE)
+    .select({ filterByFormula: filter })
+    .all();
+
+  return records.map(formatTaskRecord);
+}
+
+async function getCompletedThisWeekAll() {
+  return getCompletedThisWeek(null);
+}
+
 async function getProjects() {
   const records = await base(PROJECTS_TABLE)
     .select({
@@ -86,7 +101,6 @@ async function getProjects() {
 }
 
 async function findTaskByName(taskDescription) {
-  // Fetch recent open tasks and find the closest match
   const records = await base(TASKS_TABLE)
     .select({
       filterByFormula: `{Status} != "Done"`,
@@ -104,6 +118,16 @@ async function findTaskByName(taskDescription) {
   return match ? formatTaskRecord(match) : null;
 }
 
+function getMondayOfCurrentWeek() {
+  const now = new Date();
+  const day = now.getUTCDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now);
+  monday.setUTCDate(now.getUTCDate() + diff);
+  monday.setUTCHours(0, 0, 0, 0);
+  return monday.toISOString().split('T')[0];
+}
+
 function formatTaskRecord(record) {
   return {
     id: record.id,
@@ -114,6 +138,7 @@ function formatTaskRecord(record) {
     priority: record.fields['Priority'] || 'Medium',
     category: record.fields['Category'] || null,
     dueDate: record.fields['Due Date'] || null,
+    dateCompleted: record.fields['Date Completed'] || null,
   };
 }
 
@@ -129,6 +154,8 @@ module.exports = {
   getTasksByAssignee,
   getTasksByName,
   getAllOpenTasks,
+  getCompletedThisWeek,
+  getCompletedThisWeekAll,
   getProjects,
   findTaskByName,
 };

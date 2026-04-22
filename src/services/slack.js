@@ -43,29 +43,28 @@ async function getUserInfo(userId) {
   return result.user;
 }
 
+async function getUserDisplayName(userId) {
+  try {
+    const user = await getUserInfo(userId);
+    return (user.profile && user.profile.display_name) || user.real_name || user.name || 'Someone';
+  } catch {
+    return 'Someone';
+  }
+}
+
 async function joinChannel(channelId) {
   const client = getClient();
   try {
     await client.conversations.join({ channel: channelId });
-  } catch (err) {
-    // Already a member or can't join — ignore
-  }
-}
-
-async function openDirectMessage(userId) {
-  const client = getClient();
-  const result = await client.conversations.open({ users: userId });
-  return result.channel.id;
-}
-
-async function getUserIdByEmail(email) {
-  const client = getClient();
-  try {
-    const result = await client.users.lookupByEmail({ email });
-    return result.user ? result.user.id : null;
   } catch {
-    return null;
+    // Already a member or can't join
   }
+}
+
+async function getChannelInfo(channelId) {
+  const client = getClient();
+  const result = await client.conversations.info({ channel: channelId });
+  return result.channel;
 }
 
 async function getChannelIdByName(channelName) {
@@ -85,13 +84,31 @@ async function getChannelIdByName(channelName) {
   return null;
 }
 
+async function openDirectMessage(userId) {
+  const client = getClient();
+  const result = await client.conversations.open({ users: userId });
+  return result.channel.id;
+}
+
+async function getUserIdByEmail(email) {
+  const client = getClient();
+  try {
+    const result = await client.users.lookupByEmail({ email });
+    return result.user ? result.user.id : null;
+  } catch {
+    return null;
+  }
+}
+
 module.exports = {
   postMessage,
   postThreadReply,
   getChannelHistory,
   downloadFile,
   getUserInfo,
+  getUserDisplayName,
   joinChannel,
+  getChannelInfo,
   getChannelIdByName,
   openDirectMessage,
   getUserIdByEmail,

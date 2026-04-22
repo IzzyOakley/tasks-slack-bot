@@ -2,11 +2,16 @@
 
 const { WebClient } = require('@slack/web-api');
 
-// In-memory cache for the duration of a function invocation
 const userCache = new Map();
 
 function getSlackClient() {
   return new WebClient(process.env.SLACK_BOT_TOKEN);
+}
+
+function isSteve(email) {
+  if (!email) return false;
+  const steveEmail = process.env.STEVE_EMAIL || 'steve@oakleyhomebuilders.com';
+  return email.toLowerCase() === steveEmail.toLowerCase();
 }
 
 async function resolveUserEmail(slackUserId) {
@@ -20,7 +25,6 @@ async function resolveUserEmail(slackUserId) {
       userCache.set(slackUserId, email);
       return email;
     }
-    // Fallback: no email found (guest accounts, etc.)
     return null;
   } catch (err) {
     console.error(`Failed to resolve email for user ${slackUserId}:`, err.message);
@@ -70,4 +74,4 @@ async function resolveUserByEmail(email) {
   }
 }
 
-module.exports = { resolveUserEmail, resolveUserByDisplayName, resolveUserByEmail };
+module.exports = { resolveUserEmail, resolveUserByDisplayName, resolveUserByEmail, isSteve };
