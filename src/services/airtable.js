@@ -80,9 +80,13 @@ async function updateTask(recordId, fields, table) {
 async function getTasksByAssignee(email) {
   const table = getTableForEmail(email);
   const records = await getBase()(table)
-    .select({ filterByFormula: `AND({Assignee} = "${email}", {Status} != "Done")` })
+    .select({ filterByFormula: `NOT({Status} = "Done")` })
     .all();
-  const tasks = records.map((r) => formatTaskRecord(r, table)).sort(sortByPriority);
+  const lower = (email || '').toLowerCase();
+  const tasks = records
+    .map((r) => formatTaskRecord(r, table))
+    .filter((t) => t.assigneeEmail && t.assigneeEmail.toLowerCase() === lower)
+    .sort(sortByPriority);
   if (table === TECH_TABLE) return enrichTechTasksWithProjectNames(tasks);
   return tasks;
 }
