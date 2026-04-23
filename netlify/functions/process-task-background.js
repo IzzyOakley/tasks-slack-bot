@@ -477,7 +477,9 @@ async function logTasksToAirtable(tasks, opts) {
 
     if (!assigneeEmail) continue;
 
-    const projectRecordId = await matchProjectForEmail(task.projectName, assigneeEmail);
+    const projectRecordId = isIzzy(assigneeEmail)
+      ? await matchProjectForEmail(task.projectName, assigneeEmail)
+      : null;
 
     const taskFields = {
       taskName: task.taskName,

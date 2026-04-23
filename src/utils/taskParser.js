@@ -1,17 +1,11 @@
 'use strict';
 
-const { getOperationalProjects, getTechProjects, isIzzy } = require('../services/airtable');
+const { getTechProjects, isIzzy } = require('../services/airtable');
 
 const PRIORITY_ORDER = { Urgent: 0, High: 1, Medium: 2, Low: 3 };
 
-// Per-invocation caches
-let opProjectsCache = null;
+// Per-invocation cache
 let techProjectsCache = null;
-
-async function getOpProjectsCache() {
-  if (!opProjectsCache) opProjectsCache = await getOperationalProjects();
-  return opProjectsCache;
-}
 
 async function getTechProjectsCache() {
   if (!techProjectsCache) techProjectsCache = await getTechProjects();
@@ -24,14 +18,6 @@ function normalizeStr(str) {
 
 // ─── Project matching ─────────────────────────────────────────────────────────
 
-async function matchOperationalProject(projectName) {
-  if (!projectName) return null;
-  const projects = await getOpProjectsCache();
-  const norm = normalizeStr(projectName);
-  const match = projects.find((p) => normalizeStr(p.name) === norm);
-  return match ? match.recordId : null;
-}
-
 async function matchTechProject(projectName) {
   if (!projectName) return null;
   const projects = await getTechProjectsCache();
@@ -41,9 +27,8 @@ async function matchTechProject(projectName) {
 }
 
 async function matchProjectForEmail(projectName, email) {
-  if (!projectName) return null;
-  if (isIzzy(email)) return matchTechProject(projectName);
-  return matchOperationalProject(projectName);
+  if (!projectName || !isIzzy(email)) return null;
+  return matchTechProject(projectName);
 }
 
 // ─── Emoji helpers ────────────────────────────────────────────────────────────
@@ -60,17 +45,14 @@ function formatPriorityEmoji(priority) {
 
 function formatCategoryEmoji(category) {
   const map = {
-    Permits: '🏗',
-    Subcontractors: '🔧',
-    Materials: '📦',
-    Client: '👤',
-    Site: '🏠',
-    Finance: '💰',
-    Admin: '📋',
-    Draws: '💵',
-    Proposals: '📄',
-    Lots: '🏘',
-    'Vendor Management': '🤝',
+    'Project Sub-contractors/vendors': '🔧',
+    'Active Clients': '👤',
+    'Sales': '📄',
+    'Office Procurement': '🛒',
+    'Accountant': '💰',
+    'IT & Systems': '💻',
+    'Real Estate Work': '🏘',
+    'Internal Team Collaboration': '🤝',
   };
   return map[category] || '📌';
 }
@@ -185,7 +167,6 @@ function buildPriorityBlocks(tasks, header) {
 }
 
 module.exports = {
-  matchOperationalProject,
   matchTechProject,
   matchProjectForEmail,
   formatPriorityEmoji,

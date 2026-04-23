@@ -18,8 +18,27 @@ For each task, return a JSON array of objects with these fields:
   This is where the complete information goes. Never leave this blank if there is meaningful context in the original message.
 - assigneeEmail: string or null (email if clearly mentioned or strongly implied, else null)
 - priority: "Urgent" | "High" | "Medium" | "Low" (infer from urgency language; default "Medium")
-- category: string or null (ONLY for non-Izzy tasks — one of: Permits, Subcontractors, Materials, Client, Site, Finance, Admin, Draws, Proposals, Lots, Vendor Management. Set null for Izzy's tasks)
-- projectName: string or null — see PROJECT MATCHING RULES below
+- category: string (required for all Operational tasks — Dan and other team members)
+  Choose the single best fit from this list:
+  "Project Sub-contractors/vendors" | "Active Clients" | "Sales" | "Office Procurement" |
+  "Accountant" | "IT & Systems" | "Real Estate Work" | "Internal Team Collaboration"
+
+  Categorisation guide for Oakley Home Builders context:
+  - Project Sub-contractors/vendors: anything involving subs, suppliers, vendors, materials,
+    site work, inspections, deliveries, bids from contractors
+  - Active Clients: client-facing tasks, client communication, walkthroughs, approvals,
+    change orders, client follow-ups
+  - Sales: new leads, proposals, estimates, pre-contract work, showing properties
+  - Office Procurement: office supplies, equipment purchases, non-project purchasing
+  - Accountant: invoices, draws, payments, payroll, financial reviews, accounting tasks
+  - IT & Systems: software, tools, computer or system issues for the operations team
+  - Real Estate Work: lot acquisitions, land, property transactions, real estate admin
+  - Internal Team Collaboration: internal meetings, team coordination, HR, onboarding,
+    staff-related tasks
+
+  When in doubt between two categories, pick the one closest to the core action being performed.
+  Set null only for Izzy's tasks (Tech & Innovation). Never null for Operational tasks.
+- projectName: string | null — only populated for Izzy's tasks. Always null for everyone else.
 - dueDate: string or null (ISO 8601 date if a deadline is mentioned, else null)
 - notes: string or null (specific notes about the task, e.g. "ask about Thursday availability", "call before noon")
 - solutionDescription: string or null (usually null at creation)
@@ -28,18 +47,16 @@ ROUTING RULE: If assigneeEmail is elizabeth@oakleyhomebuilders.com — this is a
 
 PROJECT MATCHING RULES:
 
-For Izzy's tasks (assigneeEmail = elizabeth@oakleyhomebuilders.com):
-Use semantic reasoning to match the task context to the most relevant project from this list.
+For Izzy's tasks (assigneeEmail = elizabeth@oakleyhomebuilders.com) only:
+Use semantic reasoning to match the task context to the most relevant Tech Project.
 Even if the project is not explicitly named, infer from keywords and context.
-Example: "bid automation" or "bid messages" → "Bid Automated Reminders".
 If no reasonable match exists, return null.
 You MUST return the project name exactly as it appears in this list (spelling and capitalisation must match).
 
 Available Tech Projects: {{TECH_PROJECTS_LIST}}
 
-For Dan's tasks (all other assignees):
-Only set projectName if a project name or address is explicitly mentioned in the message
-(e.g. "14 Oak St", "Henderson build"). Do not infer or guess. If not explicitly mentioned, return null.
+For all other tasks (Dan and any other team member):
+Always return null for projectName. No project linking for Operational Tasks.
 
 Return ONLY valid JSON. No markdown. No explanation. If no tasks found, return [].
 

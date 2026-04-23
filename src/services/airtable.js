@@ -4,7 +4,6 @@ const Airtable = require('airtable');
 
 const OPERATIONAL_TABLE = 'Operational Tasks';
 const TECH_TABLE = 'Tech & Innovation Tasks';
-const PROJECTS_TABLE = 'Projects';
 const TECH_PROJECTS_TABLE = 'Tech Projects';
 
 const IZZY_EMAIL = 'elizabeth@oakleyhomebuilders.com';
@@ -40,7 +39,6 @@ async function createOperationalTask(fields) {
   if (fields.dueDate) payload['Due Date'] = fields.dueDate;
   if (fields.notes) payload['Notes'] = fields.notes;
   if (fields.rawInput) payload['Raw Input'] = fields.rawInput;
-  if (fields.projectRecordId) payload['Project'] = [fields.projectRecordId];
   return getBase()(OPERATIONAL_TABLE).create(payload);
 }
 
@@ -129,13 +127,6 @@ async function getCompletedThisWeekAll() {
 }
 
 // ─── Project lookups ──────────────────────────────────────────────────────────
-
-async function getOperationalProjects() {
-  const records = await getBase()(PROJECTS_TABLE)
-    .select({ fields: ['Project'] })
-    .all();
-  return records.map((r) => ({ name: r.fields['Project'] || '', recordId: r.id }));
-}
 
 async function getTechProjects() {
   const records = await getBase()(TECH_PROJECTS_TABLE)
@@ -241,7 +232,6 @@ module.exports = {
   getAllOpenTasks,
   getCompletedThisWeek,
   getCompletedThisWeekAll,
-  getOperationalProjects,
   getTechProjects,
   findTaskByName,
   isIzzy,
