@@ -2,6 +2,8 @@
 
 require('dotenv').config();
 
+const fetch = require('node-fetch');
+
 const {
   extractTasksFromText, extractTasksFromImage, parseCommand, parseManagementCommand,
 } = require('../../src/services/claude');
@@ -50,6 +52,12 @@ exports.handler = async (event) => {
     return { statusCode: 200 };
   }
 
+  // Slash command payload (forwarded from slash-command.js)
+  if (payload.slash_command) {
+    await handleSlashCommand(payload.slash_command);
+    return { statusCode: 200 };
+  }
+
   const slackEvent = payload.event;
   console.log('EVENT:', JSON.stringify({
     type: slackEvent?.type,
@@ -70,8 +78,15 @@ exports.handler = async (event) => {
         await handleAppMention(slackEvent);
       }
     } else if (slackEvent.type === 'message' && !slackEvent.subtype) {
-      if ((slackEvent.text || '').trim().startsWith('<@')) return { statusCode: 200 };
-      if (slackEvent.channel_type === 'im') {
+      if ((slackEvent.text || '').trim().startsWith('<@')) {
+        // @mention in a message event — route to command handling
+        // (covers the common case where app_mention event isn't subscribed)
+        if (slackEvent.channel_type === 'im') {
+          await handleDMMessage(slackEvent);
+        } else {
+          await handleAppMention(slackEvent);
+        }
+      } else if (slackEvent.channel_type === 'im') {
         await handleDMMessage(slackEvent);
       } else {
         await handleChannelMessage(slackEvent);
@@ -786,6 +801,71 @@ function buildPersonalDigestBlocks(tasks, email) {
       elements: [{ type: 'mrkdwn', text: `${tasks.length} open task${tasks.length !== 1 ? 's' : ''} — reply to me to manage your list.` }],
     },
   ];
+}
+
+// ─── Slash commands ───────────────────────────────────────────────────────────
+
+async function handleSlashCommand({ command, user_id, response_url }) {
+  const userEmail = await resolveUserEmail(user_id);
+  if (!userEmail) {
+    await postToResponseUrl(response_url, {
+      response_type: 'ephemeral',
+      text: '⚠️ Could not resolve your Slack account. Make sure your email is set in your Slack profile.',
+    });
+    return;
+  }
+
+  const tasks = await getTasksByAssignee(userEmail);
+  let filtered = tasks;
+  let title;
+
+  if (command === '/urgent') {
+    filtered = tasks.filter((t) => t.priority === 'Urgent' || t.priority === 'High');
+    title = `Urgent & high priority tasks (${filtered.length})`;
+  } else if (command === '/inprogress') {
+    filtered = tasks.filter((t) => t.status === 'In Progress');
+    title = `In-progress tasks (${filtered.length})`;
+  } else {
+    title = `Your open tasks (${filtered.length})`;
+  }
+
+  if (!filtered.length) {
+    const empty = {
+      '/mylist': 'You have no open tasks. 🎉',
+      '/urgent': 'No urgent or high priority tasks.',
+      '/inprogress': 'No tasks currently in progress.',
+    };
+    await postToResponseUrl(response_url, {
+      response_type: 'ephemeral',
+      replace_original: true,
+      text: empty[command] || 'No tasks found.',
+    });
+    return;
+  }
+
+  const blocks = [
+    { type: 'section', text: { type: 'mrkdwn', text: `*${title}*` } },
+    ...buildPersonalTaskBlocks(filtered, userEmail),
+  ];
+
+  await postToResponseUrl(response_url, {
+    response_type: 'ephemeral',
+    replace_original: true,
+    blocks,
+    text: title,
+  });
+}
+
+async function postToResponseUrl(url, payload) {
+  try {
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    console.error('Failed to post to response_url:', err.message);
+  }
 }
 
 // ─── Help messages ────────────────────────────────────────────────────────────
