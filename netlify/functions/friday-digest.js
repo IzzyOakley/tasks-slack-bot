@@ -7,6 +7,7 @@ const {
   getAllOpenOperationalTasks, getAllOpenTechTasks,
   getCompletedThisWeekAll, isIzzy,
 } = require('../../src/services/airtable');
+const { rewriteTasksForReport } = require('../../src/services/claude');
 const { postMessage } = require('../../src/services/slack');
 const { getPersonalTaskChannels } = require('../../src/utils/channelMap');
 const { groupTasksByAssignee, buildPersonalTaskBlocks } = require('../../src/utils/taskParser');
@@ -153,8 +154,15 @@ async function runFridayDigest() {
   const allOpenTasks = [...opTasks, ...techTasks];
   const weekLabel = getMondayDate();
 
-  const completedGrouped = groupTasksByAssignee(completedTasks);
-  const openGrouped = groupTasksByAssignee(allOpenTasks);
+  // Rewrite task names for report tone — one Claude call for the whole digest
+  const rewrittenMap = await rewriteTasksForReport(completedTasks, allOpenTasks);
+  const applyRewrites = (tasks) => tasks.map((t) => ({
+    ...t,
+    taskName: rewrittenMap.get(t.id) || t.taskName,
+  }));
+
+  const completedGrouped = groupTasksByAssignee(applyRewrites(completedTasks));
+  const openGrouped = groupTasksByAssignee(applyRewrites(allOpenTasks));
 
   await Promise.all([
     postCentralFridaySummary(completedGrouped, openGrouped, weekLabel),

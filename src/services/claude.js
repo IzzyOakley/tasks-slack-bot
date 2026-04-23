@@ -251,10 +251,41 @@ async function callWithRetry(messages, system) {
   }
 }
 
+// ─── Friday digest rewriter ───────────────────────────────────────────────────
+
+async function rewriteTasksForReport(completedTasks, openTasks) {
+  const items = [
+    ...completedTasks.map((t) => ({ id: t.id, name: t.taskName, type: 'completed' })),
+    ...openTasks.map((t) => ({ id: t.id, name: t.taskName, type: 'open' })),
+  ];
+  if (!items.length) return new Map();
+
+  const system = `Rewrite construction company task names for a professional weekly report.
+- "completed" tasks → confident past tense (e.g. "Called framing sub", "Reviewed Henderson invoices", "Resolved MargO security issue")
+- "open" tasks → forward-looking present/future (e.g. "Follow up on permits", "Complete bid automation setup", "Send updated proposal")
+Keep names short: 2–6 words. Preserve the subject matter exactly — just change the tense and tone.
+Return ONLY valid JSON array: [{ "id": "...", "rewritten": "..." }]`;
+
+  try {
+    const response = await client.messages.create({
+      model: MODEL,
+      max_tokens: 1500,
+      system,
+      messages: [{ role: 'user', content: JSON.stringify(items) }],
+    });
+    const result = JSON.parse(response.content[0].text.trim());
+    return new Map(result.map((r) => [r.id, r.rewritten]));
+  } catch (err) {
+    console.error('rewriteTasksForReport failed:', err.message);
+    return new Map();
+  }
+}
+
 module.exports = {
   extractTasksFromText,
   extractTasksFromImage,
   parseCommand,
   parseManagementCommand,
   parseSolutionOrNoteUpdate,
+  rewriteTasksForReport,
 };
