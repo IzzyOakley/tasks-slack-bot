@@ -3,10 +3,10 @@
 require('dotenv').config();
 
 const { schedule } = require('@netlify/functions');
-const { getAllOpenTasks } = require('../../src/services/airtable');
-const { postMessage } = require('../../src/services/slack');
+const { getAllOpenOperationalTasks, getAllOpenTechTasks, isIzzy } = require('../../src/services/airtable');
+const { postMessage, getUserIdByEmail, openDirectMessage } = require('../../src/services/slack');
 const { getPersonalTaskChannels } = require('../../src/utils/channelMap');
-const { groupTasksByAssignee, groupTasksByPriority, formatPriorityEmoji } = require('../../src/utils/taskParser');
+const { groupTasksByAssignee, buildPersonalTaskBlocks } = require('../../src/utils/taskParser');
 const { isSteve } = require('../../src/utils/userMap');
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -20,29 +20,16 @@ function capitalize(str) {
   return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
 }
 
-function buildPrioritySection(tasks) {
-  const blocks = [];
-  const groups = groupTasksByPriority(tasks);
-  for (const [priority, items] of Object.entries(groups)) {
-    if (!items.length) continue;
-    const emoji = formatPriorityEmoji(priority);
-    const lines = items.map((t) => `  - ${t.taskName}`).join('\n');
-    blocks.push({
-      type: 'section',
-      text: { type: 'mrkdwn', text: `${emoji} *${priority}*\n${lines}` },
-    });
-  }
-  return blocks;
-}
+// ─── Central channel digest ───────────────────────────────────────────────────
 
-async function postCentralDigest(tasks, dateStr) {
+async function postCentralDigest(grouped, dateStr) {
   const channel = process.env.CENTRAL_CHANNEL_ID;
   if (!channel) {
     console.error('CENTRAL_CHANNEL_ID not set - skipping central Monday digest');
     return;
   }
 
-  const grouped = groupTasksByAssignee(tasks);
+  const totalTasks = Object.values(grouped).reduce((sum, tasks) => sum + tasks.length, 0);
 
   const blocks = [
     {
@@ -52,24 +39,26 @@ async function postCentralDigest(tasks, dateStr) {
     { type: 'divider' },
   ];
 
-  for (const [email, personTasks] of Object.entries(grouped)) {
+  for (const [email, tasks] of Object.entries(grouped)) {
     if (email === 'Unassigned' || isSteve(email)) continue;
-    const name = capitalize(email.split('@')[0]);
+    const displayName = capitalize(email.split('@')[0]);
+    const label = isIzzy(email) ? 'Tech & Innovation' : 'Operations';
     blocks.push({
       type: 'section',
-      text: { type: 'mrkdwn', text: `*${name} (${personTasks.length} open task${personTasks.length !== 1 ? 's' : ''})*` },
+      text: { type: 'mrkdwn', text: `*${displayName} — ${label} (${tasks.length} task${tasks.length !== 1 ? 's' : ''})*` },
     });
-    blocks.push(...buildPrioritySection(personTasks));
+    blocks.push(...buildPersonalTaskBlocks(tasks, email));
     blocks.push({ type: 'divider' });
   }
 
   await postMessage(channel, `Week of ${dateStr} - Team Task Overview`, { blocks });
-  console.log(`Monday central digest posted: ${tasks.length} tasks`);
+  console.log(`Monday central digest posted: ${totalTasks} tasks`);
 }
 
-async function postPersonalChannelDigests(tasks, dateStr) {
+// ─── Personal channel digests ─────────────────────────────────────────────────
+
+async function postPersonalChannelDigests(grouped, dateStr) {
   const personalChannels = await getPersonalTaskChannels();
-  const grouped = groupTasksByAssignee(tasks);
 
   for (const ch of personalChannels) {
     const ownerName = ch.ownerFirstName;
@@ -81,16 +70,18 @@ async function postPersonalChannelDigests(tasks, dateStr) {
     if (!ownerTasks.length) continue;
 
     const displayName = capitalize(ownerName);
+    const label = ownerEmail && isIzzy(ownerEmail) ? 'Tech & Innovation' : 'Operations';
+
     const blocks = [
       {
         type: 'header',
         text: { type: 'plain_text', text: `Week of ${dateStr} - ${displayName}'s Tasks`, emoji: true },
       },
       { type: 'divider' },
-      ...buildPrioritySection(ownerTasks),
+      ...buildPersonalTaskBlocks(ownerTasks, ownerEmail || ''),
       {
         type: 'context',
-        elements: [{ type: 'mrkdwn', text: `${ownerTasks.length} open task${ownerTasks.length !== 1 ? 's' : ''}` }],
+        elements: [{ type: 'mrkdwn', text: `${ownerTasks.length} open ${label} task${ownerTasks.length !== 1 ? 's' : ''}` }],
       },
     ];
 
@@ -103,19 +94,27 @@ async function postPersonalChannelDigests(tasks, dateStr) {
   }
 }
 
-async function runMondayDigest() {
-  const tasks = await getAllOpenTasks();
-  const today = new Date();
-  const dateStr = formatDate(today);
+// ─── Runner ───────────────────────────────────────────────────────────────────
 
-  if (!tasks.length) {
+async function runMondayDigest() {
+  const [opTasks, techTasks] = await Promise.all([
+    getAllOpenOperationalTasks(),
+    getAllOpenTechTasks(),
+  ]);
+
+  const allTasks = [...opTasks, ...techTasks];
+  if (!allTasks.length) {
     console.log('No open tasks for Monday digest');
     return;
   }
 
+  const today = new Date();
+  const dateStr = formatDate(today);
+  const grouped = groupTasksByAssignee(allTasks);
+
   await Promise.all([
-    postCentralDigest(tasks, dateStr),
-    postPersonalChannelDigests(tasks, dateStr),
+    postCentralDigest(grouped, dateStr),
+    postPersonalChannelDigests(grouped, dateStr),
   ]);
 }
 

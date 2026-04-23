@@ -9,38 +9,44 @@ const TASK_EXTRACTION_SYSTEM = `You are a task extraction assistant for Oakley H
 
 For each task, return a JSON array of objects with these fields:
 - taskName: string (action-oriented title, max 100 characters, start with a verb)
-- description: string or null (additional context if available)
-- assigneeEmail: string or null (email if clearly mentioned or strongly implied, otherwise null)
-- priority: "Urgent" | "High" | "Medium" | "Low" (infer from urgency language; default to "Medium")
-- category: one of ["Project Sub-contractors/vendors", "Active Clients", "Sales", "Office Procurement", "Accountant", "IT & Systems", "Real Estate Work", "Internal Team Collaboration"] — infer from context
-- projectName: string or null (project or address mentioned, e.g. "14 Oak St", "Henderson build")
-- dueDate: string or null (ISO 8601 date format if a deadline is mentioned, otherwise null)
+- description: string or null (additional context)
+- assigneeEmail: string or null (email if clearly mentioned or strongly implied, else null)
+- priority: "Urgent" | "High" | "Medium" | "Low" (infer from urgency language; default "Medium")
+- category: string or null (ONLY for non-Izzy tasks — one of: Permits, Subcontractors, Materials, Client, Site, Finance, Admin, Draws, Proposals, Lots, Vendor Management. Set null for Izzy's tasks)
+- projectName: string or null (project or address mentioned, e.g. "14 Oak St", "Henderson build", "MargO")
+- dueDate: string or null (ISO 8601 date if a deadline is mentioned, else null)
+- notes: string or null (specific notes about the task, e.g. "ask about Thursday availability", "call before noon")
+- solutionDescription: string or null (usually null at creation)
 
-Return ONLY valid JSON. No markdown. No explanation. If no tasks are found, return [].
+ROUTING RULE: If assigneeEmail is elizabeth@oakleyhomebuilders.com — this is a Tech & Innovation task (no category needed, set category null). All other assignees — Operational task (category required).
 
-Team context:
-- Dan (dan@oakleyhomebuilders.com) — site operations, subcontractors, materials
-- Izzy / Elizabeth (elizabeth@oakleyhomebuilders.com) — project management, proposals, client communication
+Return ONLY valid JSON. No markdown. No explanation. If no tasks found, return [].
+
+Team:
+- Dan (dan@oakleyhomebuilders.com) — site operations, subcontractors, materials, permits, vendor management
+- Izzy / Elizabeth (elizabeth@oakleyhomebuilders.com) — tech systems, project management, software, integrations
 - Steve (steve@oakleyhomebuilders.com) — oversight only, NEVER assign tasks to Steve
 - "Draws" = construction payment draw requests | "Prelim" = preliminary proposal
-- Urgency words like "ASAP", "today", "urgent", "critical" → Priority: Urgent
-- Words like "soon", "this week", "follow up" → Priority: High`;
+- Urgency words (ASAP, today, urgent, critical) → Urgent
+- Words (soon, this week, follow up, need to) → High`;
 
-const IMAGE_SYSTEM_PREFIX = `The following image contains handwritten notes from a construction site or office. Read ALL text carefully, including marginalia, numbered lists, circled items, and any annotations. Treat every action item, to-do, follow-up, or reminder as a task.
+const IMAGE_SYSTEM_PREFIX = `The following image contains handwritten notes from a construction site or office. Read ALL text carefully, including marginalia, numbered lists, circled items, and annotations. Treat every action item, to-do, follow-up, or reminder as a task.
 
 `;
 
 const STEVE_MANAGEMENT_SYSTEM = `Steve is the company boss. He is sending a management command to update an existing task. Parse his message and return JSON:
 {
   "action": "reprioritize" | "set_deadline" | "update_status" | "query" | "unknown",
-  "taskSearch": string or null (partial task name to search for),
-  "newValue": string or null (new priority, ISO date, or status value),
+  "taskSearch": string or null,
+  "newValue": string or null,
   "targetEmail": string or null
 }
 Valid priorities: Urgent, High, Medium, Low
 Valid statuses: To Do, In Progress, Blocked, Done
-For dates, return ISO 8601 (YYYY-MM-DD). "This Friday" or "this week Friday" = the coming Friday.
+Dates: ISO 8601 (YYYY-MM-DD). "This Friday" = coming Friday.
 Return ONLY valid JSON. No markdown.`;
+
+// ─── Task extraction ──────────────────────────────────────────────────────────
 
 async function extractTasksFromText(text) {
   return callWithRetry([{ role: 'user', content: text }], TASK_EXTRACTION_SYSTEM);
@@ -59,27 +65,32 @@ async function extractTasksFromImage(imageBase64, mediaType) {
   ], systemPrompt);
 }
 
+// ─── Command parsing ──────────────────────────────────────────────────────────
+
 async function parseCommand(text, userEmail) {
   const today = new Date().toISOString().split('T')[0];
   const system = `You are a command parser for a Slack task management bot. Parse the user's message and return a JSON object.
 
 Return JSON with:
-- intent: one of ["show_my_tasks", "show_user_tasks", "show_all_tasks", "show_urgent", "show_completed", "mark_done", "set_priority", "assign_task", "add_task", "scan_channel", "help", "unknown"]
-- targetUser: string or null (name or email of another user being referenced)
-- taskDescription: string or null (description of the task being referenced or created)
+- intent: one of ["show_my_tasks", "show_user_tasks", "show_all_tasks", "show_urgent", "show_completed", "mark_done", "set_priority", "assign_task", "add_task", "add_note", "add_solution", "scan_channel", "help", "unknown"]
+- targetUser: string or null (name or email of another user)
+- taskDescription: string or null (task name being referenced or created)
 - priority: "Urgent" | "High" | "Medium" | "Low" | null
 - channel: string or null (channel name without # for scan commands, "current", or "my_messages")
+- updateValue: string or null (the text content to set — used for add_note and add_solution intents)
 
 Intent guide:
-- "show my tasks" / "what's my list" / "what do I have" → show_my_tasks
+- "show my tasks" / "what's my list" → show_my_tasks
 - "what's urgent" / "what's high priority" → show_urgent
-- "what did I complete this week" / "what did I finish" → show_completed
+- "what did I complete this week" → show_completed
 - "what's [name] working on" → show_user_tasks
 - "show all open tasks" → show_all_tasks
-- "mark [task] as done" / "complete [task]" → mark_done
+- "mark [task] as done" → mark_done
 - "set [task] to [priority]" → set_priority
 - "assign [task] to [person]" → assign_task
-- "add task: [description]" / "log task" → add_task
+- "add task: [description]" → add_task
+- "add note to [task]: [text]" → add_note (taskDescription = task name, updateValue = text)
+- "add solution to [task]: [text]" → add_solution (taskDescription = task name, updateValue = text)
 - "scan #channel" / "scan this channel" → scan_channel
 - "help" → help
 
@@ -101,6 +112,8 @@ Return ONLY valid JSON. No markdown.`;
   }
 }
 
+// ─── Steve management command parser ─────────────────────────────────────────
+
 async function parseManagementCommand(text, openTasks) {
   const today = new Date().toISOString().split('T')[0];
   const taskList = openTasks.length
@@ -121,6 +134,36 @@ async function parseManagementCommand(text, openTasks) {
     return { action: 'unknown' };
   }
 }
+
+// ─── Notes / solution update parser ──────────────────────────────────────────
+
+async function parseSolutionOrNoteUpdate(text) {
+  const system = `Parse this task update command and return JSON:
+{
+  "fieldToUpdate": "Solution Description" | "Notes",
+  "taskSearch": string,
+  "newValue": string
+}
+If the message says "add solution", "update solution", or "solution:" → "Solution Description"
+If the message says "add note", "update note", "note:", or "notes:" → "Notes"
+taskSearch: the task name or description being referenced
+newValue: the text content to set
+Return ONLY valid JSON. No markdown.`;
+
+  try {
+    const response = await client.messages.create({
+      model: MODEL,
+      max_tokens: 500,
+      system,
+      messages: [{ role: 'user', content: text }],
+    });
+    return JSON.parse(response.content[0].text.trim());
+  } catch {
+    return null;
+  }
+}
+
+// ─── Internal helpers ─────────────────────────────────────────────────────────
 
 async function callWithRetry(messages, system) {
   let raw;
@@ -157,4 +200,10 @@ async function callWithRetry(messages, system) {
   }
 }
 
-module.exports = { extractTasksFromText, extractTasksFromImage, parseCommand, parseManagementCommand };
+module.exports = {
+  extractTasksFromText,
+  extractTasksFromImage,
+  parseCommand,
+  parseManagementCommand,
+  parseSolutionOrNoteUpdate,
+};

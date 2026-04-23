@@ -1,6 +1,6 @@
 # TaskMate — Oakley Home Builders Task Bot
 
-A Claude-powered Slack bot that extracts tasks from messages and photos, logs them to Airtable, and keeps the whole team organized through three interaction layers: personal DMs, a central team channel, and personal oversight channels.
+A Claude-powered Slack bot that extracts tasks from messages and photos, routes them to the correct Airtable table based on who is assigned, and keeps the whole team organised through three interaction layers: personal DMs, a central team channel, and personal oversight channels.
 
 ---
 
@@ -9,16 +9,31 @@ A Claude-powered Slack bot that extracts tasks from messages and photos, logs th
 TaskMate operates across three layers:
 
 **Layer 1 - Personal DMs**
-Each team member can DM TaskMate directly. The bot sends a daily morning digest of your open tasks, and you can manage your list conversationally (mark done, change priority, add tasks, view list).
+Each team member DMs TaskMate directly. The bot sends a daily morning digest of your open tasks, and you can manage your list conversationally (mark done, change priority, add tasks, view list, add notes or solution descriptions).
 
 **Layer 2 - Central channel (`#oakley-operational-tasks`)**
-Post a message or photo and TaskMate extracts every actionable task, logs them to Airtable, and replies in-thread. Monday morning and Friday afternoon digests are posted here for the whole team.
+Post a message or photo and TaskMate extracts every actionable task, routes each to the correct Airtable table, and replies in-thread. Monday morning and Friday afternoon digests are posted here for the whole team.
 
 **Layer 3 - Personal oversight channels (`#dan-tasks`, `#izzy-tasks`, etc.)**
-Steve can view and manage each person's task list from their dedicated channel. Weekly digests are also posted here per person. Anyone can invite TaskMate to a personal channel by following the naming convention `#[firstname]-tasks`.
+Steve can view and manage each person's task list from their dedicated channel. Weekly digests post here per person, in that person's correct format.
 
 **Steve's role**
-Steve (`steve@oakleyhomebuilders.com`) is oversight-only. He is never assigned tasks in Airtable. When Steve messages in a team channel, TaskMate interprets his messages as management commands (reprioritize, reassign, set deadlines). When Steve DMs TaskMate, he is redirected to the personal channels.
+Steve (`steve@oakleyhomebuilders.com`) is oversight-only. He is never assigned tasks in Airtable. When Steve posts in a personal task channel, TaskMate interprets it as a management command (reprioritise, reassign, set deadlines). When Steve DMs TaskMate, he is redirected to the personal channels.
+
+---
+
+## Routing Logic
+
+This is the core rule TaskMate follows on every task creation:
+
+| Assignee | Airtable table | Project lookup | Digest format |
+|---|---|---|---|
+| Izzy (elizabeth@oakleyhomebuilders.com) | Tech & Innovation Tasks | Tech Projects (field: "Project Title") | Grouped by Project, then Priority |
+| Dan, or any other team member | Operational Tasks | Projects (field: "Project") | Grouped by Category, then Priority |
+
+**Mixed messages**: If Izzy posts "Dan needs to call the framing sub and I need to fix the MargO security integration", TaskMate creates one record in Operational Tasks (Dan) and one in Tech & Innovation Tasks (Izzy) in the same operation and labels each in the reply.
+
+**Assigned By**: Every task records who assigned it. If Izzy posts a task for Dan, the task shows Assigned By = Izzy, Assignee = Dan.
 
 ---
 
@@ -77,38 +92,77 @@ users:read.email
 
 ## Airtable Setup
 
-1. Open your Airtable base — the base ID is in the URL: `airtable.com/YOUR_BASE_ID/...`
-2. Go to [airtable.com/create/tokens](https://airtable.com/create/tokens) and create a Personal Access Token
-3. Grant these scopes:
-   - `data.records:read`
-   - `data.records:write`
-   - `schema.bases:read`
-4. Under **Access**, select your specific base
-5. Copy the token (starts with `pat...`)
+### Access Token
 
-Your Airtable base must have a table named **"Operational Tasks"** with these fields:
+1. Go to [airtable.com/create/tokens](https://airtable.com/create/tokens) and create a Personal Access Token
+2. Grant these scopes: `data.records:read`, `data.records:write`, `schema.bases:read`
+3. Under **Access**, select your specific base ("Team Collaboration")
+4. Copy the token (starts with `pat...`)
+5. Your base ID is in the Airtable URL: `airtable.com/YOUR_BASE_ID/...`
+
+### Required Tables
+
+Your Airtable base must have these four tables:
+
+**Operational Tasks** (Dan + all other team members)
 
 | Field | Type |
 |---|---|
 | Task Name | Single line text |
-| Assignee | Email |
-| Priority | Single select (Urgent, High, Medium, Low) |
-| Status | Single select (Open, In Progress, Done) |
-| Category | Single select (see values below) |
-| Project | Linked record to Projects table |
-| Notes | Long text |
+| Description | Long text |
+| Assignee | User (Collaborator) |
+| Assigned By | User (Collaborator) |
+| Status | Single select: To Do / In Progress / Blocked / Done |
+| Priority | Single select: Urgent / High / Medium / Low |
+| Project | Linked record to Projects |
+| Category | Single select — see values below |
+| Source | Single select: Slack message / Handwritten note / Email / Verbal |
+| Source Detail | Single line text |
 | Due Date | Date |
+| Date Created | Formula (auto — do NOT write to this field) |
 | Date Completed | Date |
+| Notes | Long text |
+| Raw Input | Long text |
+| Bot Created | Checkbox |
 
-**Category values** (must match exactly):
-- Project Sub-contractors/vendors
-- Active Clients
-- Sales
-- Office Procurement
-- Accountant
-- IT & Systems
-- Real Estate Work
-- Internal Team Collaboration
+Category values (must match exactly): Permits / Subcontractors / Materials / Client / Site / Finance / Admin / Draws / Proposals / Lots / Vendor Management
+
+**Tech & Innovation Tasks** (Izzy only)
+
+| Field | Type | Notes |
+|---|---|---|
+| Task Name | Single line text | |
+| Task Description | Long text | Note: field name is "Task Description", not "Description" |
+| Assignee | User (Collaborator) | |
+| Assigned By | User (Collaborator) | |
+| Status | Single select: To Do / In Progress / Blocked / Done | |
+| Priority | Single select: Urgent / High / Medium / Low | |
+| Project | Linked record to Tech Projects | |
+| Source | Single select | |
+| Source Detail | Single line text | |
+| Due Date | Date | |
+| Date Created | Formula (auto) | |
+| Date Completed | Date | |
+| Raw Input | Long text | |
+| Bot Created | Checkbox | |
+| Solution Description | Long text | How the task was resolved |
+
+**Projects** (linked to Operational Tasks)
+
+| Field | Type |
+|---|---|
+| Project | Single line text |
+| Status | Single select: Open / Closed / Completed |
+| Job Stage | Single select |
+| Project Manager | Single select |
+
+**Tech Projects** (linked to Tech & Innovation Tasks)
+
+| Field | Type | Notes |
+|---|---|---|
+| Project Title | Single line text | Field name is "Project Title" not "Project" |
+| Project description | Long text | |
+| Status | Single select | |
 
 ---
 
@@ -154,7 +208,7 @@ Any team member can invite TaskMate to a channel:
 1. Open any channel in Slack
 2. Type `/invite @TaskMate`
 
-**Personal oversight channels**: Create a channel named `#[firstname]-tasks` (e.g. `#dan-tasks`, `#izzy-tasks`) and invite TaskMate. The bot will automatically recognize it as a personal channel and route digests and Steve's management commands there.
+**Personal oversight channels**: Create a channel named `#[firstname]-tasks` (e.g. `#dan-tasks`, `#izzy-tasks`) and invite TaskMate and Steve. The bot automatically detects the naming convention and routes digests and Steve's management commands there.
 
 **DMs**: Click TaskMate's name in the sidebar and start messaging. Make sure the Messages Tab is enabled in the Slack App Home settings (see setup step 6 above).
 
@@ -166,52 +220,54 @@ Any team member can invite TaskMate to a channel:
 
 | What you type | What happens |
 |---|---|
-| `what's my list` | Show your open tasks, sorted by priority |
-| `show my tasks` | Same as above |
-| `show urgent tasks` | Show only Urgent priority tasks |
-| `show completed` | Show tasks you completed this week |
-| `mark [task] as done` | Mark a task complete |
-| `set [task] to high priority` | Change a task's priority |
-| `assign [task] to Dan` | Reassign a task to someone else |
-| `add task: [description]` | Create a task immediately |
-| Any task list or note | TaskMate extracts and logs tasks automatically |
+| `show my tasks` / `what's my list` | Your open tasks, in your correct format (Izzy: by project, others: by category) |
+| `what's urgent` | Your open tasks filtered by urgency |
+| `show completed` / `what did I complete this week` | Tasks you completed this week |
+| `mark [task] as done` | Status set to Done, Date Completed set to today |
+| `set [task] to high priority` | Priority updated |
+| `assign [task] to Dan` | Reassigns the task, DMs Dan |
+| `add task: [description]` | Creates task in your correct table |
+| `add note to [task]: [text]` | Appends note to an Operational task (Dan/others) |
+| `add solution to [task]: [text]` | Appends solution to a Tech & Innovation task (Izzy) |
+| Any task list or note | Tasks extracted and logged to your table automatically |
 
 ### Central channel commands (in `#oakley-operational-tasks`)
 
 | What you type | What happens |
 |---|---|
-| `@TaskMate what's my list` | Show your open tasks |
-| `@TaskMate show Dan's tasks` | Show Dan's open tasks |
-| `@TaskMate show all open tasks` | All open tasks grouped by assignee |
-| `@TaskMate show completed` | Tasks completed this week |
+| `@TaskMate what's my list` | Your open tasks in correct format |
+| `@TaskMate what's Dan working on` | Dan's open Operational tasks |
+| `@TaskMate what's Izzy working on` | Izzy's open Tech & Innovation tasks |
+| `@TaskMate show all open tasks` | All tasks from both tables, grouped by person |
+| `@TaskMate show completed` | Your completed tasks this week |
 | `@TaskMate mark [task] as done` | Mark a task complete |
 | `@TaskMate set [task] to urgent` | Change priority |
 | `@TaskMate assign [task] to Dan` | Reassign a task |
+| `@TaskMate add note to [task]: [text]` | Add note to Operational task |
+| `@TaskMate add solution to [task]: [text]` | Add solution to Tech task |
+| `@TaskMate scan #channel-name` | Scan a channel for tasks |
 | `@TaskMate help` | Show command reference |
-| Post any message or photo | Tasks are extracted and logged automatically |
+| Post any message or photo | Tasks extracted and routed automatically |
 
-### Steve's management commands (in any channel or personal channel)
+### Steve's management commands (in personal task channels)
 
-Steve's messages are interpreted as management instructions, not task creation:
+Steve's messages in `#[name]-tasks` channels are interpreted as management instructions:
 
 | What Steve types | What happens |
 |---|---|
-| `set [task] to urgent` | Changes that task's priority |
-| `reassign [task] to Dan` | Reassigns the task |
-| `set deadline for [task] to Friday` | Sets a due date |
-| `mark [task] as done` | Marks the task complete |
+| `set [task] to urgent` | Priority updated |
+| `reassign [task] to Dan` | Task reassigned |
+| `set deadline for [task] to Friday` | Due date set |
+| `mark [task] as done` | Status set to Done |
+| `what's on Izzy's list` | Shows Izzy's Tech tasks (by project) |
 
 ---
 
 ## Personal Channel Setup
 
-To set up a personal task channel for a team member:
-
-1. Create a Slack channel named `#[firstname]-tasks` (e.g. `#dan-tasks`)
-2. Invite the team member and invite `@TaskMate`
-3. That's it — TaskMate will automatically detect the channel and route that person's weekly digests there
-
-Steve can manage that person's tasks directly from their personal channel.
+1. Create a Slack channel named `#[firstname]-tasks` (e.g. `#dan-tasks`, `#izzy-tasks`)
+2. Invite the team member, invite Steve, and invite `@TaskMate`
+3. That's it — TaskMate automatically detects the naming pattern and routes that person's weekly digests and Steve's management commands to that channel
 
 ---
 
@@ -223,9 +279,13 @@ Steve can manage that person's tasks directly from their personal channel.
 | Monday overview | Monday at 8:00 AM EST | `#oakley-operational-tasks` + each `#[name]-tasks` channel |
 | Friday summary | Friday at 5:00 PM EDT | `#oakley-operational-tasks` + each `#[name]-tasks` channel |
 
-**Monday digest** shows all open tasks grouped by person and sorted by priority.
+**Izzy's digests** show tasks grouped by Tech Project, then Priority within each project.
 
-**Friday digest** shows what was completed during the week and what is still open.
+**Dan's (and others') digests** show tasks grouped by Category, then Priority within each category.
+
+**Monday digest** shows all open tasks with headings per person.
+
+**Friday digest** shows completed tasks this week (with checkmarks) and what remains open.
 
 ---
 
@@ -241,7 +301,13 @@ In Netlify: **Site - Functions - click a function - Logs**
 - Make sure your Netlify site is deployed before setting the Request URL in Slack.
 
 **Tasks are not appearing in Airtable**
-- Check function logs for errors. Verify `AIRTABLE_API_KEY` has `data.records:write` scope and the correct base is selected. Make sure field names in Airtable exactly match the schema.
+- Check function logs for errors. Verify `AIRTABLE_API_KEY` has `data.records:write` scope and the correct base is selected. Make sure all field names in Airtable exactly match the schema above (including "Task Description" in Tech table, and "Project Title" in Tech Projects).
+
+**Airtable 422 error about field values**
+- Category values must match exactly (capitalisation matters): Permits, Subcontractors, Materials, Client, Site, Finance, Admin, Draws, Proposals, Lots, Vendor Management. Status values must be: To Do, In Progress, Blocked, Done.
+
+**Izzy's tasks going to Operational Tasks instead of Tech & Innovation Tasks**
+- Make sure Izzy's email in Airtable and Slack is exactly `elizabeth@oakleyhomebuilders.com`. The routing is based on exact email match.
 
 **DMs to TaskMate are not working**
 - Under Slack App Home, enable the Messages Tab and make sure **Allow users to send Slash commands and messages from the messages tab** is turned on.
@@ -263,3 +329,6 @@ In Netlify: **Site - Functions - click a function - Logs**
 
 **Steve's messages are being logged as tasks**
 - Verify `STEVE_EMAIL` environment variable is set correctly in Netlify.
+
+**"add note" command returns wrong table error**
+- Notes field only exists in Operational Tasks (Dan/others). Solution Description only exists in Tech & Innovation Tasks (Izzy). Use the correct command for the task's table.

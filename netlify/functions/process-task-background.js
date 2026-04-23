@@ -2,11 +2,26 @@
 
 require('dotenv').config();
 
-const { extractTasksFromText, extractTasksFromImage, parseCommand, parseManagementCommand } = require('../../src/services/claude');
-const { createTask, updateTask, getTasksByAssignee, getAllOpenTasks, findTaskByName, getCompletedThisWeek } = require('../../src/services/airtable');
-const { postMessage, postThreadReply, getChannelHistory, downloadFile, joinChannel, getChannelIdByName, getChannelInfo, openDirectMessage, getUserIdByEmail, getUserDisplayName } = require('../../src/services/slack');
+const {
+  extractTasksFromText, extractTasksFromImage, parseCommand, parseManagementCommand,
+} = require('../../src/services/claude');
+const {
+  createOperationalTask, createTechTask, updateTask,
+  getTasksByAssignee, getAllOpenOperationalTasks, getAllOpenTechTasks, getAllOpenTasks,
+  findTaskByName, getCompletedThisWeek,
+  isIzzy, OPERATIONAL_TABLE, TECH_TABLE,
+} = require('../../src/services/airtable');
+const {
+  postMessage, postThreadReply, getChannelHistory, downloadFile,
+  joinChannel, getChannelIdByName, getChannelInfo,
+  openDirectMessage, getUserIdByEmail, getUserDisplayName,
+} = require('../../src/services/slack');
 const { resolveUserEmail, resolveUserByDisplayName, isSteve } = require('../../src/utils/userMap');
-const { matchProject, groupTasksByAssignee, buildPriorityBlocks, formatPriorityEmoji } = require('../../src/utils/taskParser');
+const {
+  matchProjectForEmail, groupTasksByAssignee,
+  buildPersonalTaskBlocks, buildTechTaskBlocks, buildOperationalTaskBlocks,
+  formatPriorityEmoji,
+} = require('../../src/utils/taskParser');
 const { isPersonalTaskChannel, getChannelOwnerName } = require('../../src/utils/channelMap');
 
 const IMAGE_TYPES = ['jpg', 'jpeg', 'png', 'heic', 'webp'];
@@ -16,7 +31,10 @@ function capitalize(str) {
   return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
 }
 
-// Use thread reply in channels, direct post in DMs
+function tableLabel(table) {
+  return table === TECH_TABLE ? 'Tech' : 'Operational';
+}
+
 async function reply(channel, ts, text, options = {}) {
   if (ts) return postThreadReply(channel, ts, text, options);
   return postMessage(channel, text, options);
@@ -46,16 +64,13 @@ exports.handler = async (event) => {
 
   try {
     if (slackEvent.type === 'app_mention') {
-      // Route mentions in DMs to DM handler
       if (slackEvent.channel_type === 'im') {
         await handleDMMessage(slackEvent);
       } else {
         await handleAppMention(slackEvent);
       }
     } else if (slackEvent.type === 'message' && !slackEvent.subtype) {
-      // Skip messages that start with a bot mention — handled by app_mention
       if ((slackEvent.text || '').trim().startsWith('<@')) return { statusCode: 200 };
-
       if (slackEvent.channel_type === 'im') {
         await handleDMMessage(slackEvent);
       } else {
@@ -66,8 +81,8 @@ exports.handler = async (event) => {
     console.error('Background function error:', err);
     const { channel, ts, channel_type } = slackEvent;
     if (channel) {
-      const msg = '⚠️ Something went wrong. Please try again or log it manually in Airtable.';
-      await reply(channel, channel_type === 'im' ? null : ts, msg).catch(() => {});
+      await reply(channel, channel_type === 'im' ? null : ts,
+        '⚠️ Something went wrong. Please try again or log it manually in Airtable.').catch(() => {});
     }
   }
 
@@ -79,7 +94,6 @@ exports.handler = async (event) => {
 async function handleChannelMessage(event) {
   const { channel, ts, user, files, text } = event;
 
-  // Resolve channel name to check if it's a personal task channel
   let channelName = '';
   try {
     const info = await getChannelInfo(channel);
@@ -94,10 +108,8 @@ async function handleChannelMessage(event) {
       await handleSteveCommand(event, channelName);
       return;
     }
-    // Channel owner posting in their own task channel — treat as normal task creation
   }
 
-  // Handle image uploads
   if (files && files.length > 0) {
     const imageFiles = files.filter((f) => IMAGE_TYPES.includes((f.filetype || '').toLowerCase()));
     if (imageFiles.length > 0) {
@@ -106,7 +118,6 @@ async function handleChannelMessage(event) {
     }
   }
 
-  // Handle text
   if (text && text.trim()) {
     const sourceDetail = channelName ? `#${channelName}` : `#${channel}`;
     await processTextMessage(text, channel, ts, user, 'Slack message', sourceDetail);
@@ -137,52 +148,49 @@ async function handleDMMessage(event) {
         await postMessage(channel, 'You have no open tasks right now. 🎉');
         return;
       }
-      const name = capitalize((userEmail || '').split('@')[0]);
-      const blocks = [
-        { type: 'section', text: { type: 'mrkdwn', text: `*Your open tasks (${tasks.length})*` } },
-        ...buildPriorityBlocks(tasks.slice(0, 20)),
-      ];
+      const blocks = buildPersonalDigestBlocks(tasks, userEmail);
       await postMessage(channel, 'Your open tasks', { blocks });
       break;
     }
 
     case 'show_completed': {
-      const completed = await getCompletedThisWeek(userEmail);
-      if (!completed.length) {
+      const tableKey = isIzzy(userEmail) ? 'tech' : 'operational';
+      const completed = await getCompletedThisWeek(tableKey);
+      const mine = completed.filter((t) => t.assigneeEmail === userEmail);
+      if (!mine.length) {
         await postMessage(channel, 'No completed tasks found for this week.');
         return;
       }
-      const lines = completed.map((t) => `  - ${t.taskName} ✓`).join('\n');
-      await postMessage(channel, `*Completed this week (${completed.length})*\n${lines}`);
+      const blocks = buildPersonalTaskBlocks(mine, userEmail);
+      await postMessage(channel, `Completed this week (${mine.length})`, { blocks });
       break;
     }
 
     case 'mark_done': {
-      const task = await findTaskByName(command.taskDescription || '');
+      const task = await findTaskByName(command.taskDescription || '', userEmail);
       if (!task) {
         await postMessage(channel, `⚠️ Could not find a task matching "${command.taskDescription}".`);
         return;
       }
-      await updateTask(task.id, { status: 'Done', dateCompleted: new Date().toISOString().split('T')[0] });
+      await updateTask(task.id, { status: 'Done', dateCompleted: new Date().toISOString().split('T')[0] }, task.table);
       await postMessage(channel, `✅ Marked "${task.taskName}" as done.`);
       break;
     }
 
     case 'set_priority': {
-      const task = await findTaskByName(command.taskDescription || '');
+      const task = await findTaskByName(command.taskDescription || '', userEmail);
       if (!task) {
         await postMessage(channel, `⚠️ Could not find a task matching "${command.taskDescription}".`);
         return;
       }
-      await updateTask(task.id, { priority: command.priority });
+      await updateTask(task.id, { priority: command.priority }, task.table);
       await postMessage(channel, `✅ Set "${task.taskName}" to ${command.priority} priority.`);
       break;
     }
 
-    case 'assign_task': {
-      await handleAssignTask(command.taskDescription, command.targetUser, channel, null, user);
+    case 'assign_task':
+      await handleAssignTask(command.taskDescription, command.targetUser, channel, null, user, userEmail);
       break;
-    }
 
     case 'add_task': {
       const taskText = command.taskDescription || cleanText;
@@ -195,16 +203,24 @@ async function handleDMMessage(event) {
         source: 'Slack message', sourceDetail: 'DM',
         rawInput: taskText, fallbackAssigneeEmail: userEmail, assignerUserId: user,
       });
-      await postMessage(channel, `✅ Logged ${created.length} task${created.length !== 1 ? 's' : ''}: ${created.map((t) => `"${t.taskName}"`).join(', ')}`);
+      await postMessage(channel, buildLogConfirmation(created));
       break;
     }
+
+    case 'add_note':
+    case 'add_solution':
+      await handleAddFieldUpdate(
+        command.taskDescription, command.updateValue,
+        command.intent === 'add_note' ? 'notes' : 'solutionDescription',
+        channel, null, userEmail
+      );
+      break;
 
     case 'help':
       await postMessage(channel, buildHelpMessage());
       break;
 
     default: {
-      // Try extracting tasks from the DM text
       const tasks = await extractTasksFromText(cleanText);
       if (!tasks || !tasks.length) {
         await postMessage(channel, `No tasks found. ${buildShortHelp()}`);
@@ -214,7 +230,7 @@ async function handleDMMessage(event) {
         source: 'Slack message', sourceDetail: 'DM',
         rawInput: cleanText, fallbackAssigneeEmail: userEmail, assignerUserId: user,
       });
-      await postMessage(channel, `✅ Logged ${created.length} task${created.length !== 1 ? 's' : ''}: ${created.map((t) => `"${t.taskName}"`).join(', ')}`);
+      await postMessage(channel, buildLogConfirmation(created));
     }
   }
 }
@@ -252,29 +268,38 @@ async function handleAppMention(event) {
       await handleShowAllTasks(channel, ts);
       break;
     case 'show_completed': {
-      const completed = await getCompletedThisWeek(userEmail);
-      if (!completed.length) {
+      const tableKey = isIzzy(userEmail) ? 'tech' : 'operational';
+      const completed = await getCompletedThisWeek(tableKey);
+      const mine = completed.filter((t) => t.assigneeEmail === userEmail);
+      if (!mine.length) {
         await reply(channel, ts, 'No completed tasks found for this week.');
         return;
       }
-      const lines = completed.map((t) => `  - ${t.taskName} ✓`).join('\n');
-      await reply(channel, ts, `*Completed this week (${completed.length})*\n${lines}`);
+      const blocks = buildPersonalTaskBlocks(mine, userEmail);
+      await reply(channel, ts, `Completed this week (${mine.length})`, { blocks });
       break;
     }
     case 'mark_done':
-      await handleMarkDone(command.taskDescription, channel, ts);
+      await handleMarkDone(command.taskDescription, channel, ts, userEmail);
       break;
     case 'set_priority':
-      await handleSetPriority(command.taskDescription, command.priority, channel, ts);
+      await handleSetPriority(command.taskDescription, command.priority, channel, ts, userEmail);
       break;
     case 'assign_task':
-      await handleAssignTask(command.taskDescription, command.targetUser, channel, ts, user);
+      await handleAssignTask(command.taskDescription, command.targetUser, channel, ts, user, userEmail);
+      break;
+    case 'add_note':
+    case 'add_solution':
+      await handleAddFieldUpdate(
+        command.taskDescription, command.updateValue,
+        command.intent === 'add_note' ? 'notes' : 'solutionDescription',
+        channel, ts, userEmail
+      );
       break;
     case 'help':
       await reply(channel, ts, buildHelpMessage(), { mrkdwn: true });
       break;
     default:
-      // Not a recognised command — treat text as tasks to extract
       await processTextMessage(cleanText, channel, ts, user, 'Slack message', `#${channel}`);
   }
 }
@@ -296,7 +321,8 @@ async function handleSteveCommand(event, channelName) {
     return;
   }
 
-  const openTasks = await getTasksByAssignee(ownerUser.email);
+  const ownerEmail = ownerUser.email;
+  const openTasks = await getTasksByAssignee(ownerEmail);
   const command = await parseManagementCommand(text, openTasks);
 
   if (!command || command.action === 'unknown') {
@@ -310,9 +336,11 @@ async function handleSteveCommand(event, channelName) {
       await postThreadReply(channel, ts, `${displayName} has no open tasks.`);
       return;
     }
+    const tableKey = isIzzy(ownerEmail) ? 'tech' : 'operational';
+    const label = tableKey === 'tech' ? 'Tech & Innovation' : 'Operations';
     const blocks = [
-      { type: 'section', text: { type: 'mrkdwn', text: `*${displayName}'s open tasks (${openTasks.length})*` } },
-      ...buildPriorityBlocks(openTasks.slice(0, 20)),
+      { type: 'section', text: { type: 'mrkdwn', text: `*${displayName} — ${label} (${openTasks.length})*` } },
+      ...buildPersonalTaskBlocks(openTasks, ownerEmail),
     ];
     await postThreadReply(channel, ts, `${displayName}'s tasks:`, { blocks });
     return;
@@ -347,7 +375,7 @@ async function handleSteveCommand(event, channelName) {
     actionDesc = `status to *${command.newValue}*`;
   }
 
-  await updateTask(task.id, updates);
+  await updateTask(task.id, updates, task.table);
   await postThreadReply(channel, ts, `✅ "${task.taskName}" — updated ${actionDesc}.`);
 }
 
@@ -360,11 +388,10 @@ function fuzzyMatchTasks(search, tasks) {
   });
 }
 
-// ─── Task extraction helpers ──────────────────────────────────────────────────
+// ─── Core task processing ─────────────────────────────────────────────────────
 
 async function processTextMessage(text, channel, ts, userId, source, sourceDetail) {
   const tasks = await extractTasksFromText(text);
-
   if (!tasks || tasks.length === 0) {
     await reply(channel, ts, 'No tasks found in that message.');
     return;
@@ -372,17 +399,15 @@ async function processTextMessage(text, channel, ts, userId, source, sourceDetai
 
   const senderEmail = userId ? await resolveUserEmail(userId) : null;
 
-  // If Steve posts in a regular channel and all tasks have no explicit assignee,
-  // he's probably writing about himself — remind him we don't track his tasks
   if (isSteve(senderEmail)) {
     const hasRealAssignee = tasks.some((t) => t.assigneeEmail && !isSteve(t.assigneeEmail));
     if (!hasRealAssignee) {
-      await reply(channel, ts, `Hi Steve — I don't track tasks for you. If this is for a team member, mention their name and I'll assign it.`);
+      await reply(channel, ts, 'Hi Steve — I don\'t track tasks for you. If this is for a team member, mention their name and I\'ll assign it.');
       return;
     }
   }
 
-  const fallbackEmail = (!isSteve(senderEmail)) ? senderEmail : null;
+  const fallbackEmail = !isSteve(senderEmail) ? senderEmail : null;
   const created = await logTasksToAirtable(tasks, {
     source, sourceDetail, rawInput: text,
     fallbackAssigneeEmail: fallbackEmail,
@@ -394,18 +419,14 @@ async function processTextMessage(text, channel, ts, userId, source, sourceDetai
     return;
   }
 
-  // Build thread reply — group by assignee if multiple people
-  const assigneeNames = [...new Set(created.map((t) => t.assigneeEmail ? capitalize(t.assigneeEmail.split('@')[0]) : null).filter(Boolean))];
-  const assigneeStr = assigneeNames.length ? ` for ${assigneeNames.join(', ')}` : '';
-  const names = created.map((t) => `"${t.taskName}"`).join(', ');
-  await reply(channel, ts, `✅ Logged ${created.length} task${created.length !== 1 ? 's' : ''}${assigneeStr}: ${names}`);
+  await reply(channel, ts, buildLogConfirmation(created));
 }
 
 async function processImageFiles(files, channel, ts, userId, caption) {
   const senderEmail = userId ? await resolveUserEmail(userId) : null;
-  const fallbackEmail = (!isSteve(senderEmail)) ? senderEmail : null;
+  const fallbackEmail = !isSteve(senderEmail) ? senderEmail : null;
   let totalLogged = 0;
-  const allNames = [];
+  const allCreated = [];
 
   for (const file of files) {
     const ext = (file.filetype || 'jpg').toLowerCase();
@@ -432,15 +453,17 @@ async function processImageFiles(files, channel, ts, userId, caption) {
     });
 
     totalLogged += created.length;
-    allNames.push(...created.map((t) => t.taskName));
+    allCreated.push(...created);
   }
 
   if (!totalLogged) {
     await reply(channel, ts, 'No tasks found in that image.');
   } else {
-    await reply(channel, ts, `✅ Logged ${totalLogged} task${totalLogged !== 1 ? 's' : ''} from image: ${allNames.map((n) => `"${n}"`).join(', ')}`);
+    await reply(channel, ts, buildLogConfirmation(allCreated));
   }
 }
+
+// ─── Task logging — dual-table routing ───────────────────────────────────────
 
 async function logTasksToAirtable(tasks, opts) {
   const { source, sourceDetail, rawInput, fallbackAssigneeEmail, assignerUserId } = opts;
@@ -448,46 +471,81 @@ async function logTasksToAirtable(tasks, opts) {
   const assignerEmail = assignerUserId ? await resolveUserEmail(assignerUserId) : null;
 
   for (const task of tasks) {
-    // Never assign to Steve
     let assigneeEmail = task.assigneeEmail && !isSteve(task.assigneeEmail)
       ? task.assigneeEmail
       : (!isSteve(fallbackAssigneeEmail) ? fallbackAssigneeEmail : null);
 
-    const projectRecordId = await matchProject(task.projectName);
+    if (!assigneeEmail) continue;
+
+    const projectRecordId = await matchProjectForEmail(task.projectName, assigneeEmail);
+
+    const taskFields = {
+      taskName: task.taskName,
+      description: task.description || null,
+      assigneeEmail,
+      assignedByEmail: assignerEmail || null,
+      priority: task.priority || 'Medium',
+      source,
+      sourceDetail,
+      dueDate: task.dueDate || null,
+      notes: task.notes || null,
+      rawInput,
+      projectRecordId,
+    };
 
     try {
-      await createTask({
-        taskName: task.taskName,
-        description: task.description || null,
+      if (isIzzy(assigneeEmail)) {
+        await createTechTask(taskFields);
+      } else {
+        await createOperationalTask({ ...taskFields, category: task.category || null });
+      }
+
+      const createdTask = {
+        ...task,
         assigneeEmail,
-        priority: task.priority || 'Medium',
-        category: task.category || null,
-        source,
-        sourceDetail,
-        dueDate: task.dueDate || null,
-        rawInput,
-        projectRecordId,
-      });
+        projectName: task.projectName || null,
+        table: isIzzy(assigneeEmail) ? TECH_TABLE : OPERATIONAL_TABLE,
+      };
+      created.push(createdTask);
 
-      created.push({ ...task, assigneeEmail });
-
-      // DM notification — only if assigned to someone other than the assigner
       if (assigneeEmail && assignerEmail && assigneeEmail !== assignerEmail) {
-        await sendTaskAssignmentNotification(task, assigneeEmail, assignerUserId, assignerEmail).catch((err) =>
+        await sendTaskAssignmentNotification(createdTask, assigneeEmail, assignerEmail).catch((err) =>
           console.error('DM notification failed:', err.message)
         );
       }
     } catch (err) {
-      console.error('Airtable createTask failed:', err.message, JSON.stringify(task));
+      console.error('Airtable create failed:', err.message, JSON.stringify(task));
     }
   }
 
   return created;
 }
 
+// Build reply string — groups by table
+function buildLogConfirmation(created) {
+  if (!created.length) return 'No tasks logged.';
+
+  const opTasks = created.filter((t) => t.table === OPERATIONAL_TABLE);
+  const techTasks = created.filter((t) => t.table === TECH_TABLE);
+  const parts = [];
+
+  if (opTasks.length) {
+    const assignees = [...new Set(opTasks.map((t) => t.assigneeEmail ? capitalize(t.assigneeEmail.split('@')[0]) : null).filter(Boolean))];
+    const names = opTasks.map((t) => `"${t.taskName}"`).join(', ');
+    parts.push(`Logged for ${assignees.join(', ')} (Operational): ${names}`);
+  }
+
+  if (techTasks.length) {
+    const names = techTasks.map((t) => `"${t.taskName}"`).join(', ');
+    parts.push(`Logged for Izzy (Tech): ${names}`);
+  }
+
+  return `✅ ${parts.join(' | ')}`;
+}
+
 // ─── Task assignment DM notification ─────────────────────────────────────────
 
-async function sendTaskAssignmentNotification(task, assigneeEmail, assignerUserId, assignerEmail) {
+async function sendTaskAssignmentNotification(task, assigneeEmail, assignerEmail) {
   if (isSteve(assigneeEmail)) return;
 
   const userId = await getUserIdByEmail(assigneeEmail);
@@ -498,12 +556,12 @@ async function sendTaskAssignmentNotification(task, assigneeEmail, assignerUserI
   const priorityEmoji = formatPriorityEmoji(task.priority || 'Medium');
 
   const details = [
-    task.priority ? `${priorityEmoji} ${task.priority}` : null,
+    `${priorityEmoji} ${task.priority || 'Medium'}`,
     task.category ? task.category : null,
     task.projectName ? task.projectName : null,
   ].filter(Boolean).join(' | ');
 
-  const text = `📋 *New task assigned to you by ${assignerName}*\n\n*${task.taskName}*${details ? `\n${details}` : ''}\n\n_Reply to me to manage your tasks._`;
+  const text = `📋 *New task assigned to you by ${assignerName}*\n\n*${task.taskName}*\n${details}\n\n_Reply to me to manage your tasks._`;
 
   await postMessage(dmChannel, text, {
     blocks: [{ type: 'section', text: { type: 'mrkdwn', text } }],
@@ -536,69 +594,78 @@ async function handleShowTasks(email, nameOrEmail, channel, ts) {
   }
 
   const displayName = capitalize(resolvedEmail.split('@')[0]);
+  const label = isIzzy(resolvedEmail) ? 'Tech & Innovation' : 'Operations';
   const blocks = [
-    { type: 'section', text: { type: 'mrkdwn', text: `*Open tasks for ${displayName} (${tasks.length})*` } },
-    ...buildPriorityBlocks(tasks.slice(0, 20)),
+    { type: 'section', text: { type: 'mrkdwn', text: `*${displayName} — ${label} (${tasks.length} task${tasks.length !== 1 ? 's' : ''})*` } },
+    ...buildPersonalTaskBlocks(tasks, resolvedEmail),
   ];
   await reply(channel, ts, `Open tasks for ${displayName}`, { blocks });
 }
 
 async function handleShowAllTasks(channel, ts) {
-  const tasks = await getAllOpenTasks();
-  if (!tasks.length) {
+  const [opTasks, techTasks] = await Promise.all([getAllOpenOperationalTasks(), getAllOpenTechTasks()]);
+  const allTasks = [...opTasks, ...techTasks];
+
+  if (!allTasks.length) {
     await reply(channel, ts, 'No open tasks found.');
     return;
   }
 
-  const grouped = groupTasksByAssignee(tasks);
+  const grouped = groupTasksByAssignee(allTasks);
   const blocks = [
-    { type: 'section', text: { type: 'mrkdwn', text: `*All Open Tasks (${tasks.length})*` } },
+    { type: 'header', text: { type: 'plain_text', text: `All Open Tasks (${allTasks.length})`, emoji: true } },
     { type: 'divider' },
   ];
 
-  for (const [assignee, assigneeTasks] of Object.entries(grouped)) {
-    const displayName = assignee !== 'Unassigned' ? capitalize(assignee.split('@')[0]) : 'Unassigned';
-    blocks.push(...buildPriorityBlocks(assigneeTasks.slice(0, 20), displayName));
+  for (const [assigneeEmail, tasks] of Object.entries(grouped)) {
+    if (assigneeEmail === 'Unassigned' || isSteve(assigneeEmail)) continue;
+    const displayName = capitalize(assigneeEmail.split('@')[0]);
+    const label = isIzzy(assigneeEmail) ? 'Tech & Innovation' : 'Operations';
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: `*${displayName} — ${label} (${tasks.length})*` },
+    });
+    blocks.push(...buildPersonalTaskBlocks(tasks, assigneeEmail));
     blocks.push({ type: 'divider' });
   }
 
   await reply(channel, ts, 'All open tasks:', { blocks });
 }
 
-async function handleMarkDone(taskDescription, channel, ts) {
+async function handleMarkDone(taskDescription, channel, ts, userEmail) {
   if (!taskDescription) {
     await reply(channel, ts, '⚠️ Please specify which task to mark as done.');
     return;
   }
-  const task = await findTaskByName(taskDescription);
+  const task = await findTaskByName(taskDescription, userEmail);
   if (!task) {
     await reply(channel, ts, `⚠️ Could not find a task matching "${taskDescription}".`);
     return;
   }
-  await updateTask(task.id, { status: 'Done', dateCompleted: new Date().toISOString().split('T')[0] });
+  await updateTask(task.id, { status: 'Done', dateCompleted: new Date().toISOString().split('T')[0] }, task.table);
   await reply(channel, ts, `✅ Marked "${task.taskName}" as done.`);
 }
 
-async function handleSetPriority(taskDescription, priority, channel, ts) {
+async function handleSetPriority(taskDescription, priority, channel, ts, userEmail) {
   if (!taskDescription || !priority) {
     await reply(channel, ts, '⚠️ Please specify the task and new priority.');
     return;
   }
-  const task = await findTaskByName(taskDescription);
+  const task = await findTaskByName(taskDescription, userEmail);
   if (!task) {
     await reply(channel, ts, `⚠️ Could not find a task matching "${taskDescription}".`);
     return;
   }
-  await updateTask(task.id, { priority });
+  await updateTask(task.id, { priority }, task.table);
   await reply(channel, ts, `✅ Set "${task.taskName}" to ${priority} priority.`);
 }
 
-async function handleAssignTask(taskDescription, targetUser, channel, ts, assignerUserId) {
+async function handleAssignTask(taskDescription, targetUser, channel, ts, assignerUserId, assignerEmail) {
   if (!taskDescription || !targetUser) {
     await reply(channel, ts, '⚠️ Please specify the task and the user to assign it to.');
     return;
   }
-  const task = await findTaskByName(taskDescription);
+  const task = await findTaskByName(taskDescription, assignerEmail);
   if (!task) {
     await reply(channel, ts, `⚠️ Could not find a task matching "${taskDescription}".`);
     return;
@@ -615,15 +682,39 @@ async function handleAssignTask(taskDescription, targetUser, channel, ts, assign
     return;
   }
 
-  await updateTask(task.id, { assigneeEmail });
+  await updateTask(task.id, { assigneeEmail }, task.table);
 
-  // DM notification
-  const assignerEmail = assignerUserId ? await resolveUserEmail(assignerUserId) : null;
   if (assignerEmail !== assigneeEmail) {
-    await sendTaskAssignmentNotification(task, assigneeEmail, assignerUserId, assignerEmail).catch(() => {});
+    await sendTaskAssignmentNotification(task, assigneeEmail, assignerEmail).catch(() => {});
   }
 
   await reply(channel, ts, `✅ Assigned "${task.taskName}" to ${capitalize(assigneeEmail.split('@')[0])}.`);
+}
+
+async function handleAddFieldUpdate(taskDescription, updateValue, field, channel, ts, userEmail) {
+  if (!taskDescription || !updateValue) {
+    await reply(channel, ts, '⚠️ Please specify the task and the text to add.');
+    return;
+  }
+  const task = await findTaskByName(taskDescription, userEmail);
+  if (!task) {
+    await reply(channel, ts, `⚠️ Could not find a task matching "${taskDescription}".`);
+    return;
+  }
+
+  if (field === 'notes' && task.table !== OPERATIONAL_TABLE) {
+    await reply(channel, ts, `⚠️ Notes can only be added to Operational tasks. "${task.taskName}" is a Tech & Innovation task. Try "add solution to ${task.taskName}: [text]" instead.`);
+    return;
+  }
+  if (field === 'solutionDescription' && task.table !== TECH_TABLE) {
+    await reply(channel, ts, `⚠️ Solution descriptions can only be added to Tech & Innovation tasks. "${task.taskName}" is an Operational task. Try "add note to ${task.taskName}: [text]" instead.`);
+    return;
+  }
+
+  const updates = { [field]: updateValue };
+  await updateTask(task.id, updates, task.table);
+  const label = field === 'notes' ? 'Note' : 'Solution';
+  await reply(channel, ts, `✅ ${label} added to "${task.taskName}".`);
 }
 
 async function handleScanCommand(commandText, channel, ts, userId, userEmail) {
@@ -673,11 +764,26 @@ async function handleScanCommand(commandText, channel, ts, userId, userEmail) {
     source: 'Slack message',
     sourceDetail: channelLabel,
     rawInput: `Scanned from ${channelLabel}`,
-    fallbackAssigneeEmail: (!isSteve(userEmail)) ? userEmail : null,
+    fallbackAssigneeEmail: !isSteve(userEmail) ? userEmail : null,
     assignerUserId: userId,
   });
 
-  await reply(channel, ts, `✅ Scanned ${channelLabel} — logged ${created.length} task${created.length !== 1 ? 's' : ''}: ${created.map((t) => `"${t.taskName}"`).join(', ')}`);
+  await reply(channel, ts, `✅ Scanned ${channelLabel} — ${buildLogConfirmation(created)}`);
+}
+
+// ─── Digest block builder for DM/channel show-tasks responses ─────────────────
+
+function buildPersonalDigestBlocks(tasks, email) {
+  const displayName = capitalize((email || '').split('@')[0]);
+  const label = isIzzy(email) ? 'Tech & Innovation' : 'Operations';
+  return [
+    { type: 'section', text: { type: 'mrkdwn', text: `*${displayName} — ${label} (${tasks.length} open task${tasks.length !== 1 ? 's' : ''})*` } },
+    ...buildPersonalTaskBlocks(tasks, email),
+    {
+      type: 'context',
+      elements: [{ type: 'mrkdwn', text: `${tasks.length} open task${tasks.length !== 1 ? 's' : ''} — reply to me to manage your list.` }],
+    },
+  ];
 }
 
 // ─── Help messages ────────────────────────────────────────────────────────────
@@ -686,18 +792,20 @@ function buildHelpMessage() {
   return `*TaskMate — Commands*
 
 *In any channel*
-- Post a message → tasks extracted and logged automatically
+- Post a message → tasks extracted and logged automatically (Izzy's go to Tech & Innovation, all others to Operational)
 - Upload a photo of handwritten notes → tasks extracted from image
 
 *Mention commands*
 - \`@TaskMate what's my list\` — your open tasks
 - \`@TaskMate what's Dan working on\` — someone else's tasks
-- \`@TaskMate show all open tasks\` — full team view
+- \`@TaskMate show all open tasks\` — full team view (both tables)
 - \`@TaskMate what did I complete this week\` — your completions
 - \`@TaskMate mark [task] as done\`
 - \`@TaskMate set [task] to urgent\`
 - \`@TaskMate assign [task] to Dan\`
 - \`@TaskMate add task: [description]\`
+- \`@TaskMate add note to [task]: [text]\` — add note to Operational task
+- \`@TaskMate add solution to [task]: [text]\` — add solution to Tech task
 - \`@TaskMate scan #channel-name\`
 
 *In your DM with TaskMate*
@@ -705,9 +813,7 @@ function buildHelpMessage() {
 - Your tasks only — no one else's are visible to you
 
 *Personal task channels (#dan-tasks, #izzy-tasks)*
-- Steve can reprioritise, set deadlines, and update status here
-
-*Note:* TaskMate cannot be added to 1:1 DMs. Use a group DM or #task-inbox instead.`;
+- Steve can reprioritise, set deadlines, and update status here`;
 }
 
 function buildShortHelp() {
