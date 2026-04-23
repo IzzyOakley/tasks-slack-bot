@@ -1,24 +1,45 @@
 'use strict';
 
 const Anthropic = require('@anthropic-ai/sdk');
+const { getTechProjects } = require('./airtable');
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = 'claude-opus-4-6';
 
-const TASK_EXTRACTION_SYSTEM = `You are a task extraction assistant for Oakley Home Builders, a residential construction company. Extract every discrete, actionable task from the input.
+const TASK_EXTRACTION_SYSTEM_TEMPLATE = `You are a task extraction assistant for Oakley Home Builders, a residential construction company. Extract every discrete, actionable task from the input.
 
 For each task, return a JSON array of objects with these fields:
-- taskName: string (action-oriented title, max 100 characters, start with a verb)
-- description: string or null (additional context)
+- taskName: string — STRICT RULE: 3 to 6 words maximum, headline style, starts with a verb.
+  Think ticket title, not sentence.
+  Good: "Fix bid package duplicates", "Set up bid automation interface", "Call framing sub"
+  Bad: "Fix duplicates showing up in bid packages", "I need to set up an interactive interface for bid automated messages"
+  The full detail belongs in the description field, not the task name.
+- description: string or null — full detail, context, and everything that doesn't fit in the task name.
+  This is where the complete information goes. Never leave this blank if there is meaningful context in the original message.
 - assigneeEmail: string or null (email if clearly mentioned or strongly implied, else null)
 - priority: "Urgent" | "High" | "Medium" | "Low" (infer from urgency language; default "Medium")
 - category: string or null (ONLY for non-Izzy tasks — one of: Permits, Subcontractors, Materials, Client, Site, Finance, Admin, Draws, Proposals, Lots, Vendor Management. Set null for Izzy's tasks)
-- projectName: string or null (project or address mentioned, e.g. "14 Oak St", "Henderson build", "MargO")
+- projectName: string or null — see PROJECT MATCHING RULES below
 - dueDate: string or null (ISO 8601 date if a deadline is mentioned, else null)
 - notes: string or null (specific notes about the task, e.g. "ask about Thursday availability", "call before noon")
 - solutionDescription: string or null (usually null at creation)
 
 ROUTING RULE: If assigneeEmail is elizabeth@oakleyhomebuilders.com — this is a Tech & Innovation task (no category needed, set category null). All other assignees — Operational task (category required).
+
+PROJECT MATCHING RULES:
+
+For Izzy's tasks (assigneeEmail = elizabeth@oakleyhomebuilders.com):
+Use semantic reasoning to match the task context to the most relevant project from this list.
+Even if the project is not explicitly named, infer from keywords and context.
+Example: "bid automation" or "bid messages" → "Bid Automated Reminders".
+If no reasonable match exists, return null.
+You MUST return the project name exactly as it appears in this list (spelling and capitalisation must match).
+
+Available Tech Projects: {{TECH_PROJECTS_LIST}}
+
+For Dan's tasks (all other assignees):
+Only set projectName if a project name or address is explicitly mentioned in the message
+(e.g. "14 Oak St", "Henderson build"). Do not infer or guess. If not explicitly mentioned, return null.
 
 Return ONLY valid JSON. No markdown. No explanation. If no tasks found, return [].
 
@@ -29,6 +50,18 @@ Team:
 - "Draws" = construction payment draw requests | "Prelim" = preliminary proposal
 - Urgency words (ASAP, today, urgent, critical) → Urgent
 - Words (soon, this week, follow up, need to) → High`;
+
+async function buildExtractionSystem() {
+  let techProjectsList = '(none available)';
+  try {
+    const projects = await getTechProjects();
+    const titles = projects.map((p) => p.title).filter(Boolean);
+    if (titles.length) techProjectsList = titles.join(', ');
+  } catch (err) {
+    console.error('Failed to fetch tech projects for prompt:', err.message);
+  }
+  return TASK_EXTRACTION_SYSTEM_TEMPLATE.replace('{{TECH_PROJECTS_LIST}}', techProjectsList);
+}
 
 const IMAGE_SYSTEM_PREFIX = `The following image contains handwritten notes from a construction site or office. Read ALL text carefully, including marginalia, numbered lists, circled items, and annotations. Treat every action item, to-do, follow-up, or reminder as a task.
 
@@ -49,11 +82,12 @@ Return ONLY valid JSON. No markdown.`;
 // ─── Task extraction ──────────────────────────────────────────────────────────
 
 async function extractTasksFromText(text) {
-  return callWithRetry([{ role: 'user', content: text }], TASK_EXTRACTION_SYSTEM);
+  const systemPrompt = await buildExtractionSystem();
+  return callWithRetry([{ role: 'user', content: text }], systemPrompt);
 }
 
 async function extractTasksFromImage(imageBase64, mediaType) {
-  const systemPrompt = IMAGE_SYSTEM_PREFIX + TASK_EXTRACTION_SYSTEM;
+  const systemPrompt = IMAGE_SYSTEM_PREFIX + (await buildExtractionSystem());
   return callWithRetry([
     {
       role: 'user',

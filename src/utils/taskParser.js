@@ -28,24 +28,16 @@ async function matchOperationalProject(projectName) {
   if (!projectName) return null;
   const projects = await getOpProjectsCache();
   const norm = normalizeStr(projectName);
-  const exact = projects.find((p) => normalizeStr(p.name) === norm);
-  if (exact) return exact.recordId;
-  const partial = projects.find(
-    (p) => normalizeStr(p.name).includes(norm) || norm.includes(normalizeStr(p.name))
-  );
-  return partial ? partial.recordId : null;
+  const match = projects.find((p) => normalizeStr(p.name) === norm);
+  return match ? match.recordId : null;
 }
 
 async function matchTechProject(projectName) {
   if (!projectName) return null;
   const projects = await getTechProjectsCache();
   const norm = normalizeStr(projectName);
-  const exact = projects.find((p) => normalizeStr(p.title) === norm);
-  if (exact) return exact.recordId;
-  const partial = projects.find(
-    (p) => normalizeStr(p.title).includes(norm) || norm.includes(normalizeStr(p.title))
-  );
-  return partial ? partial.recordId : null;
+  const match = projects.find((p) => normalizeStr(p.title) === norm);
+  return match ? match.recordId : null;
 }
 
 async function matchProjectForEmail(projectName, email) {
