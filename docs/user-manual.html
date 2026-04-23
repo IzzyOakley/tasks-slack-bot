@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaskMate — User Manual</title>
+<style>
+  /* ─── Base ─── */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #F4F6F9;
+    color: #1E2A3A;
+    line-height: 1.6;
+  }
+
+  /* ─── Cover ─── */
+  .cover {
+    background: linear-gradient(135deg, #0F2942 0%, #1B5286 60%, #2471A3 100%);
+    color: white;
+    padding: 80px 60px 70px;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover::before {
+    content: '';
+    position: absolute;
+    top: -80px; right: -80px;
+    width: 380px; height: 380px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.05);
+  }
+  .cover::after {
+    content: '';
+    position: absolute;
+    bottom: -120px; left: -40px;
+    width: 500px; height: 300px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.03);
+  }
+  .cover-badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: #A9CCE3;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    padding: 6px 16px;
+    border-radius: 20px;
+    margin-bottom: 28px;
+  }
+  .cover h1 {
+    font-size: 58px;
+    font-weight: 800;
+    letter-spacing: -1.5px;
+    line-height: 1.05;
+    margin-bottom: 20px;
+  }
+  .cover h1 span { color: #F39C12; }
+  .cover-sub {
+    font-size: 20px;
+    color: #A9CCE3;
+    max-width: 520px;
+    margin-bottom: 50px;
+    font-weight: 400;
+  }
+  .cover-meta {
+    display: flex;
+    gap: 40px;
+    flex-wrap: wrap;
+  }
+  .cover-meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .cover-meta-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #7FB3D3;
+  }
+  .cover-meta-value {
+    font-size: 15px;
+    font-weight: 600;
+    color: white;
+  }
+
+  /* ─── Layout ─── */
+  .page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 40px 80px;
+  }
+
+  /* ─── Section headers ─── */
+  .section-divider {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 60px 0 32px;
+  }
+  .section-num {
+    background: #0F2942;
+    color: white;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .section-title {
+    font-size: 26px;
+    font-weight: 800;
+    color: #0F2942;
+    letter-spacing: -0.5px;
+  }
+  .section-line {
+    flex: 1;
+    height: 2px;
+    background: linear-gradient(to right, #0F2942, transparent);
+    opacity: 0.15;
+  }
+
+  /* ─── Intro block ─── */
+  .intro {
+    background: white;
+    border-radius: 12px;
+    padding: 36px 40px;
+    margin: 40px 0 0;
+    border-left: 5px solid #1B5286;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .intro p {
+    font-size: 17px;
+    color: #2C3E50;
+    line-height: 1.75;
+  }
+
+  /* ─── Three-layer cards ─── */
+  .layer-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-top: 28px;
+  }
+  .layer-card {
+    border-radius: 12px;
+    padding: 28px 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .layer-card.blue  { background: linear-gradient(145deg, #1B5286, #2471A3); color: white; }
+  .layer-card.teal  { background: linear-gradient(145deg, #0E6655, #1A8A74); color: white; }
+  .layer-card.amber { background: linear-gradient(145deg, #B7770D, #D4A017); color: white; }
+  .layer-num {
+    font-size: 52px;
+    font-weight: 900;
+    opacity: 0.2;
+    line-height: 1;
+    margin-bottom: 8px;
+    letter-spacing: -2px;
+  }
+  .layer-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    opacity: 0.75;
+    margin-bottom: 10px;
+  }
+  .layer-card h3 {
+    font-size: 17px;
+    font-weight: 800;
+    margin-bottom: 10px;
+    line-height: 1.3;
+  }
+  .layer-card p {
+    font-size: 13.5px;
+    opacity: 0.9;
+    line-height: 1.6;
+  }
+
+  /* ─── Routing table ─── */
+  .routing-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 24px;
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .routing-table th {
+    background: #0F2942;
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 14px 20px;
+    text-align: left;
+  }
+  .routing-table td {
+    padding: 16px 20px;
+    font-size: 14px;
+    border-bottom: 1px solid #EDF2F7;
+    vertical-align: top;
+  }
+  .routing-table tr:last-child td { border-bottom: none; }
+  .routing-table tr:nth-child(even) td { background: #FAFBFC; }
+  .tag {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11.5px;
+    font-weight: 700;
+  }
+  .tag-blue  { background: #D6EAF8; color: #1B5286; }
+  .tag-green { background: #D5F5E3; color: #0E6655; }
+  .tag-amber { background: #FDEBD0; color: #9A5E0A; }
+
+  /* ─── Method cards ─── */
+  .method-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-top: 28px;
+  }
+  .method-card {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .method-header {
+    padding: 20px 24px 16px;
+    font-weight: 800;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .method-header.blue  { background: #EBF5FB; color: #1B4F72; border-bottom: 3px solid #2471A3; }
+  .method-header.green { background: #E9F7EF; color: #0E5E45; border-bottom: 3px solid #1A8A74; }
+  .method-header.orange { background: #FEF9E7; color: #7D5A0A; border-bottom: 3px solid #D4A017; }
+  .method-icon {
+    font-size: 22px;
+  }
+  .method-body {
+    padding: 20px 24px;
+    font-size: 13.5px;
+    color: #4A5568;
+    line-height: 1.65;
+  }
+
+  /* ─── Command blocks ─── */
+  .command-section {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    margin-top: 24px;
+  }
+  .command-section-header {
+    padding: 18px 28px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .command-section-header.navy  { background: #0F2942; color: #A9CCE3; }
+  .command-section-header.teal  { background: #0E6655; color: #A9DFBF; }
+  .command-section-header.amber { background: #9A5E0A; color: #FDEBD0; }
+  .command-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-bottom: 1px solid #EDF2F7;
+  }
+  .command-row:last-child { border-bottom: none; }
+  .command-cell {
+    padding: 16px 28px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .command-cell:first-child {
+    border-right: 1px solid #EDF2F7;
+  }
+  code {
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    background: #F0F4F8;
+    color: #1B5286;
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .command-cell .label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #A0AEC0;
+    margin-bottom: 4px;
+  }
+  .command-cell .desc {
+    color: #4A5568;
+  }
+
+  /* ─── Call-out boxes ─── */
+  .callout {
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin: 24px 0;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  .callout-blue  { background: #EBF5FB; border-left: 4px solid #2471A3; }
+  .callout-green { background: #E9F7EF; border-left: 4px solid #1A8A74; }
+  .callout-amber { background: #FEF3CD; border-left: 4px solid #F39C12; }
+  .callout-red   { background: #FDEDEC; border-left: 4px solid #E74C3C; }
+  .callout-icon  { font-size: 22px; flex-shrink: 0; margin-top: 1px; }
+  .callout-body  { flex: 1; }
+  .callout-title { font-weight: 800; font-size: 14px; margin-bottom: 6px; color: #1E2A3A; }
+  .callout-text  { font-size: 13.5px; color: #4A5568; line-height: 1.6; }
+  .callout-text code { background: rgba(255,255,255,0.7); }
+
+  /* ─── Example chat bubbles ─── */
+  .chat-demo {
+    background: #F7F8FC;
+    border-radius: 12px;
+    padding: 24px 28px;
+    margin: 20px 0;
+    border: 1px solid #E2E8F0;
+  }
+  .chat-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #A0AEC0;
+    margin-bottom: 16px;
+  }
+  .bubble-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    margin-bottom: 12px;
+  }
+  .bubble-row:last-child { margin-bottom: 0; }
+  .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .avatar.user { background: #2471A3; }
+  .avatar.bot  { background: #0F2942; }
+  .bubble {
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 13.5px;
+    max-width: 85%;
+    line-height: 1.55;
+  }
+  .bubble.user { background: white; border: 1px solid #E2E8F0; color: #2C3E50; }
+  .bubble.bot  { background: #0F2942; color: #D6EAF8; }
+  .bubble.bot strong { color: #F7DC6F; }
+  .bubble-name { font-size: 10.5px; font-weight: 700; color: #A0AEC0; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* ─── Digest preview ─── */
+  .digest-preview {
+    background: #1E2A3A;
+    border-radius: 12px;
+    padding: 28px 32px;
+    color: white;
+    margin: 24px 0;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-size: 13px;
+    line-height: 1.8;
+  }
+  .digest-preview .d-header { color: #F7DC6F; font-weight: 700; font-size: 15px; margin-bottom: 16px; }
+  .digest-preview .d-project { color: #85C1E9; font-weight: 700; margin-top: 12px; }
+  .digest-preview .d-cat { color: #82E0AA; font-weight: 700; margin-top: 12px; }
+  .digest-preview .d-task-urgent { color: #F1948A; }
+  .digest-preview .d-task-high { color: #F0B27A; }
+  .digest-preview .d-task-med { color: #F7DC6F; }
+  .digest-preview .d-task-low { color: #BDC3C7; }
+  .digest-preview .d-footer { color: #7FB3D3; font-size: 12px; margin-top: 16px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px; }
+
+  /* ─── Schedule grid ─── */
+  .schedule-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-top: 24px;
+  }
+  .schedule-card {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .schedule-card-top {
+    padding: 20px 22px 16px;
+    border-bottom: 1px solid #EDF2F7;
+  }
+  .schedule-time {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .schedule-card:nth-child(1) .schedule-time { color: #2471A3; }
+  .schedule-card:nth-child(2) .schedule-time { color: #0E6655; }
+  .schedule-card:nth-child(3) .schedule-time { color: #9A5E0A; }
+  .schedule-name {
+    font-size: 16px;
+    font-weight: 800;
+    color: #0F2942;
+  }
+  .schedule-card-body {
+    padding: 16px 22px;
+    font-size: 13px;
+    color: #4A5568;
+    line-height: 1.6;
+  }
+
+  /* ─── Tips grid ─── */
+  .tips-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-top: 24px;
+  }
+  .tip-card {
+    background: white;
+    border-radius: 10px;
+    padding: 22px 24px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    display: flex;
+    gap: 14px;
+  }
+  .tip-icon { font-size: 24px; flex-shrink: 0; }
+  .tip-title { font-size: 14px; font-weight: 800; color: #0F2942; margin-bottom: 6px; }
+  .tip-text { font-size: 13px; color: #4A5568; line-height: 1.6; }
+
+  /* ─── Quick reference ─── */
+  .qr-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    margin-top: 24px;
+  }
+  .qr-table thead tr {
+    background: #0F2942;
+  }
+  .qr-table th {
+    color: #A9CCE3;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 14px 20px;
+    text-align: left;
+  }
+  .qr-table td {
+    padding: 13px 20px;
+    font-size: 13.5px;
+    border-bottom: 1px solid #EDF2F7;
+    vertical-align: middle;
+  }
+  .qr-table tr:last-child td { border-bottom: none; }
+  .qr-table tr:nth-child(even) td { background: #FAFBFC; }
+  .qr-table .row-group td {
+    background: #EBF5FB;
+    color: #1B4F72;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 8px 20px;
+  }
+
+  /* ─── Footer ─── */
+  footer {
+    background: #0F2942;
+    color: #7FB3D3;
+    text-align: center;
+    padding: 36px 40px;
+    font-size: 13px;
+    line-height: 2;
+    margin-top: 80px;
+  }
+  footer strong { color: white; }
+
+  /* ─── Print ─── */
+  @media print {
+    body { background: white; }
+    .cover { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .layer-card, .command-section-header, .routing-table th, .qr-table thead tr { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .section-divider { margin-top: 40px; }
+    .page { padding: 0 20px 40px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ─── Cover ─── -->
+<div class="cover">
+  <div style="max-width:900px;margin:0 auto;position:relative;z-index:1;">
+    <div class="cover-badge">Oakley Home Builders · Internal</div>
+    <h1>Task<span>Mate</span></h1>
+    <p class="cover-sub">Your AI-powered task assistant in Slack. Log tasks, manage your list, and never let anything fall through the cracks — without ever opening Airtable.</p>
+    <div class="cover-meta">
+      <div class="cover-meta-item">
+        <span class="cover-meta-label">Version</span>
+        <span class="cover-meta-value">3.0</span>
+      </div>
+      <div class="cover-meta-item">
+        <span class="cover-meta-label">Updated</span>
+        <span class="cover-meta-value">April 2026</span>
+      </div>
+      <div class="cover-meta-item">
+        <span class="cover-meta-label">Audience</span>
+        <span class="cover-meta-value">Whole Team</span>
+      </div>
+      <div class="cover-meta-item">
+        <span class="cover-meta-label">Platform</span>
+        <span class="cover-meta-value">Slack + Airtable</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page">
+
+  <!-- ─── 1. What is TaskMate ─── -->
+  <div class="section-divider">
+    <span class="section-num">01</span>
+    <h2 class="section-title">What is TaskMate?</h2>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="intro">
+    <p>TaskMate is a bot that lives inside Slack. When you post a message — or take a photo of handwritten notes — it reads your words, pulls out every action item, and logs each one as a separate task in Airtable. No forms. No copy-paste. Just post normally and the work gets captured automatically.</p>
+  </div>
+
+  <div class="layer-grid">
+    <div class="layer-card blue">
+      <div class="layer-num">01</div>
+      <div class="layer-label">Layer One</div>
+      <h3>Your Personal DM</h3>
+      <p>A private chat between you and TaskMate. Get your daily morning digest here and manage your own tasks by typing naturally.</p>
+    </div>
+    <div class="layer-card teal">
+      <div class="layer-num">02</div>
+      <div class="layer-label">Layer Two</div>
+      <h3>Central Channel</h3>
+      <p>#oakley-operational-tasks — the team hub. Log tasks for anyone, see the full team view, and receive Monday and Friday digests.</p>
+    </div>
+    <div class="layer-card amber">
+      <div class="layer-num">03</div>
+      <div class="layer-label">Layer Three</div>
+      <h3>Personal Task Channels</h3>
+      <p>#dan-tasks, #izzy-tasks — private channels with just you, Steve, and TaskMate. Steve manages priorities here. Weekly digests land here too.</p>
+    </div>
+  </div>
+
+
+  <!-- ─── 2. Task Routing ─── -->
+  <div class="section-divider">
+    <span class="section-num">02</span>
+    <h2 class="section-title">Where Do Tasks Go?</h2>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="callout callout-blue">
+    <span class="callout-icon">🔀</span>
+    <div class="callout-body">
+      <div class="callout-title">Automatic routing — you don't need to think about this</div>
+      <div class="callout-text">TaskMate automatically sends every task to the right Airtable table based on who it's assigned to. It also records <strong>who logged the task</strong> (Assigned By), even if that person isn't the one doing it.</div>
+    </div>
+  </div>
+
+  <table class="routing-table">
+    <thead>
+      <tr>
+        <th>Assignee</th>
+        <th>Airtable Table</th>
+        <th>Digest Format</th>
+        <th>Project Matching</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Izzy</strong><br><span style="color:#888;font-size:12px;">elizabeth@oakleyhomebuilders.com</span></td>
+        <td><span class="tag tag-blue">Tech &amp; Innovation Tasks</span></td>
+        <td>Grouped by Project, then Priority</td>
+        <td>AI-inferred from context (e.g. "bid messages" → "Bid Automated Reminders")</td>
+      </tr>
+      <tr>
+        <td><strong>Dan</strong>, and everyone else</td>
+        <td><span class="tag tag-green">Operational Tasks</span></td>
+        <td>Grouped by Category, then Priority</td>
+        <td>Explicit mention required (e.g. "Henderson build", "14 Oak St")</td>
+      </tr>
+      <tr>
+        <td><strong>Steve</strong></td>
+        <td><span class="tag tag-amber">No tasks in Airtable</span></td>
+        <td>Oversight only</td>
+        <td>Steve's messages are management commands, not tasks</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-amber" style="margin-top:20px;">
+    <span class="callout-icon">💡</span>
+    <div class="callout-body">
+      <div class="callout-title">Mixed messages work</div>
+      <div class="callout-text">If Izzy posts "Dan needs to call the framing sub and I need to fix the MargO security integration", TaskMate creates one record in Operational Tasks for Dan and one in Tech &amp; Innovation Tasks for Izzy — in the same operation. The reply will show: <code>✅ Logged for Dan (Operational): "Call framing sub" | Logged for Izzy (Tech): "Fix MargO security"</code></div>
+    </div>
+  </div>
+
+
+  <!-- ─── 3. Logging Tasks ─── -->
+  <div class="section-divider">
+    <span class="section-num">03</span>
+    <h2 class="section-title">Logging Tasks</h2>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="method-grid">
+    <div class="method-card">
+      <div class="method-header blue">
+        <span class="method-icon">💬</span>
+        Method 1 — Post a Message
+      </div>
+      <div class="method-body">
+        Type your tasks into any channel TaskMate is in. No special format needed. The bot reads your message and logs every action item as a separate Airtable record.
+        <br><br>
+        <strong>Add TaskMate to a channel:</strong><br>Type <code>/invite @TaskMate</code> in any channel.
+      </div>
+    </div>
+    <div class="method-card">
+      <div class="method-header green">
+        <span class="method-icon">📸</span>
+        Method 2 — Photo of Notes
+      </div>
+      <div class="method-body">
+        Upload a photo of any handwritten notes — site notepad, whiteboard, sticky note. TaskMate reads the handwriting and logs every task it finds.
+        <br><br>
+        <strong>On phone:</strong> tap the 📎 icon and choose photo.<br>
+        <strong>On desktop:</strong> drag and drop into Slack.
+      </div>
+    </div>
+    <div class="method-card">
+      <div class="method-header orange">
+        <span class="method-icon">💌</span>
+        Method 3 — DM TaskMate
+      </div>
+      <div class="method-body">
+        Open a direct message with TaskMate and type your tasks. They go to your correct Airtable table automatically.
+        <br><br>
+        <strong>Find TaskMate:</strong> Look under Apps in your Slack sidebar, or search for it.
+      </div>
+    </div>
+  </div>
+
+  <div class="chat-demo" style="margin-top:28px;">
+    <div class="chat-label">Example — Posting in a channel</div>
+    <div class="bubble-row">
+      <div class="avatar user">👤</div>
+      <div>
+        <div class="bubble-name">Dan</div>
+        <div class="bubble user">Need to call the framing sub about 14 Oak St ASAP. Also order window hardware this week and follow up with county on Henderson permits.</div>
+      </div>
+    </div>
+    <div class="bubble-row">
+      <div class="avatar bot">🤖</div>
+      <div>
+        <div class="bubble-name">TaskMate</div>
+        <div class="bubble bot">✅ <strong>Logged for Dan (Operational): </strong>"Call framing sub", "Order window hardware", "Follow up Henderson permits"</div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ─── 4. Channel Commands ─── -->
+  <div class="section-divider">
+    <span class="section-num">04</span>
+    <h2 class="section-title">Commands — In Channels</h2>
+    <div class="section-line"></div>
+  </div>
+
+  <p style="font-size:15px;color:#4A5568;margin-bottom:8px;">Mention the bot with <code>@TaskMate</code> followed by your request. Natural language works — you don't need to memorize exact phrasing.</p>
+
+  <div class="command-section">
+    <div class="command-section-header navy">📋 &nbsp; View Tasks</div>
+    <div class="command-row">
+      <div class="command-cell">
+        <div class="label">Command</div>
+        <code>@TaskMate what's my list</code>
+      </div>
+      <div class="command-cell">
+        <div class="label">What happens</div>
+        <div class="desc">Shows your open tasks in your personal format — Izzy gets tasks by project, everyone else by category and priority.</div>
+      </div>
+    </div>
+    <div class="command-row">
+      <div class="command-cell"><code>@TaskMate what's Dan working on</code></div>
+      <div class="command-cell"><div class="desc">Shows another person's open tasks in their format.</div></div>
+    </div>
+    <div class="command-row">
+      <div class="command-cell"><code>@TaskMate show all open tasks</code></div>
+      <div class="command-cell"><div class="desc">Full team view — all open tasks from both tables, grouped by person.</div></div>
+    </div>
+    <div class="command-row">
+      <div class="command-cell"><code>@TaskMate show completed</code></div>
+      <div class="command-cell"><div class="desc">Tasks you completed this week.</div></div>
+    </div>
+  </div>
+
+  <div class="command-section" style="margin-top:16px;">
+    <div class="command-section-header navy">✏️ &nbsp; Update Tasks</div>
+    <div class="command-row">
+      <div class="command-cell"><code>@TaskMate mark "call framing sub" as done</code></div>
+      <div class="command-cell"><div class="desc">Sets Status to Done and records today's date. You don't need the exact task name — close enough works.</div></div>
+    </div>
+    <div class="command-row">
+      <div class="command-cell"><code>@TaskMate set "order window hardware" to urgent</code></div>
+      <div class="command-cell"><div class="desc">Changes priority. Options: <strong>Urgent</strong>, <strong>High</strong>, <strong>Medium</strong>, <strong>Low</strong>.</div></div>
+    </div>
+    <div class="command-row">
+      <div class="command-cell"><code>@TaskMate assign "call framing sub" to Dan</code></div>
+      <div class="command-cell"><div class="desc">Reassigns the task and sends Dan a DM notification.</div></div>
+    </div>
+    <div class="command-row">
+      <div class="command-cell"><code>@TaskMate add task: review Jake's Plumbing invoice</code></div>
+      <div class="command-cell"><div class="desc">Creates a task immediately, assigned to you.</div></div>
+    </div>
+  </div>
+
+  <div class="command-section" style="margin-top:16px;">
+    <div class="command-section-header teal">📝 &nbsp; Add Notes &amp; Solutions</div>
+    <div class="command-row">
+      <div class="command-cell"><code>@TaskMate add note to "call framing sub": ask about Thursday availability</code></div>
+      <div class="command-cell"><div class="desc">Adds a note to an <strong>Operational task</strong> (Dan and others). Good for context or follow-up reminders.</div></div>
+    </div>
+    <div class="command-row">
+      <div class="command-cell"><code>@TaskMate add solution to "fix MargO security": rotated API keys and updated token</code></div>
+      <div class="command-cell"><div class="desc">Adds a solution description to a <strong>Tech &amp; Innovation task</strong> (Izzy). Documents how the issue was resolved.</div></div>
+    </div>
+  </div>
+
+  <div class="command-section" style="margin-top:16px;">
+    <div class="command-section-header navy">🔍 &nbsp; Scan &amp; Help</div>
+    <div class="command-row">
+      <div class="command-cell"><code>@TaskMate scan #permits-channel</code></div>
+      <div class="command-cell"><div class="desc">Scans the last 100 messages in a channel and logs any tasks found. Also works with "scan this channel" or "scan my recent messages".</div></div>
+    </div>
+    <div class="command-row">
+      <div class="command-cell"><code>@TaskMate help</code></div>
+      <div class="command-cell"><div class="desc">Posts the full command reference in Slack.</div></div>
+    </div>
+  </div>
+
+
+  <!-- ─── 5. DM Commands ─── -->
+  <div class="section-divider">
+    <span class="section-num">05</span>
+    <h2 class="section-title">Commands — In Your Personal DM</h2>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="callout callout-green">
+    <span class="callout-icon">💬</span>
+    <div class="callout-body">
+      <div class="callout-title">Same commands, no @mention needed</div>
+      <div class="callout-text">In your private DM with TaskMate, all the same commands work — just type them directly without <code>@TaskMate</code>. Your DM only shows your own tasks. No one else can see them here.</div>
+    </div>
+  </div>
+
+  <div class="chat-demo">
+    <div class="chat-label">Example — Managing tasks in your DM</div>
+    <div class="bubble-row">
+      <div class="avatar user">👤</div>
+      <div>
+        <div class="bubble-name">You</div>
+        <div class="bubble user">show my tasks</div>
+      </div>
+    </div>
+    <div class="bubble-row">
+      <div class="avatar bot">🤖</div>
+      <div>
+        <div class="bubble-name">TaskMate</div>
+        <div class="bubble bot">🏗 <strong>Permits</strong><br>&nbsp;&nbsp;🔴 Follow up Henderson permit<br>&nbsp;&nbsp;🟠 Submit 14 Oak permit<br><br>🔧 <strong>Subcontractors</strong><br>&nbsp;&nbsp;🟠 Call framing sub<br>&nbsp;&nbsp;🟡 Review electrician bid</div>
+      </div>
+    </div>
+    <div class="bubble-row">
+      <div class="avatar user">👤</div>
+      <div>
+        <div class="bubble-name">You</div>
+        <div class="bubble user">mark "call framing sub" as done</div>
+      </div>
+    </div>
+    <div class="bubble-row">
+      <div class="avatar bot">🤖</div>
+      <div>
+        <div class="bubble-name">TaskMate</div>
+        <div class="bubble bot">✅ Marked <strong>"Call framing sub"</strong> as done.</div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ─── 6. Steve's Commands ─── -->
+  <div class="section-divider">
+    <span class="section-num">06</span>
+    <h2 class="section-title">Steve's Oversight Commands</h2>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="callout callout-amber">
+    <span class="callout-icon">👔</span>
+    <div class="callout-body">
+      <div class="callout-title">Steve is oversight-only</div>
+      <div class="callout-text">Steve is never assigned tasks in Airtable. When Steve posts in a personal task channel like <code>#dan-tasks</code> or <code>#izzy-tasks</code>, TaskMate interprets it as a management command — not task creation. Steve's updates appear silently in the next digest.</div>
+    </div>
+  </div>
+
+  <div class="command-section">
+    <div class="command-section-header amber">👔 &nbsp; Steve in #dan-tasks, #izzy-tasks, etc.</div>
+    <div class="command-row">
+      <div class="command-cell"><code>set the Henderson permit task to urgent</code></div>
+      <div class="command-cell"><div class="desc">Changes priority to Urgent.</div></div>
+    </div>
+    <div class="command-row">
+      <div class="command-cell"><code>set deadline for "call framing sub" to Friday</code></div>
+      <div class="command-cell"><div class="desc">Sets a due date on the task.</div></div>
+    </div>
+    <div class="command-row">
+      <div class="command-cell"><code>mark the invoice review as done</code></div>
+      <div class="command-cell"><div class="desc">Sets Status to Done.</div></div>
+    </div>
+    <div class="command-row">
+      <div class="command-cell"><code>reassign the materials delivery to Dan</code></div>
+      <div class="command-cell"><div class="desc">Reassigns the task.</div></div>
+    </div>
+    <div class="command-row">
+      <div class="command-cell"><code>what's on Dan's list</code></div>
+      <div class="command-cell"><div class="desc">Shows Dan's open tasks in his format (category/priority).</div></div>
+    </div>
+  </div>
+
+  <div class="callout callout-blue" style="margin-top:20px;">
+    <span class="callout-icon">🔔</span>
+    <div class="callout-body">
+      <div class="callout-title">Ambiguous matches</div>
+      <div class="callout-text">If more than one task matches what Steve typed, TaskMate will ask for clarification: <em>"I found 2 tasks matching that — which one? 1. Call framing sub — 14 Oak &nbsp; 2. Call framing sub — Henderson"</em></div>
+    </div>
+  </div>
+
+
+  <!-- ─── 7. Digests ─── -->
+  <div class="section-divider">
+    <span class="section-num">07</span>
+    <h2 class="section-title">Automated Digests</h2>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="schedule-grid">
+    <div class="schedule-card">
+      <div class="schedule-card-top">
+        <div class="schedule-time">Weekdays · 8:00 AM</div>
+        <div class="schedule-name">☀️ Morning Digest</div>
+      </div>
+      <div class="schedule-card-body">
+        Sent as a <strong>personal DM</strong> to each team member. Shows only your own open tasks, in your personal format. Skips Steve.
+      </div>
+    </div>
+    <div class="schedule-card">
+      <div class="schedule-card-top">
+        <div class="schedule-time">Monday · 8:00 AM</div>
+        <div class="schedule-name">📅 Week Kickoff</div>
+      </div>
+      <div class="schedule-card-body">
+        Posted to <strong>#oakley-operational-tasks</strong> (full team) and to each <strong>#[name]-tasks</strong> channel (individual). Shows all open tasks for the week.
+      </div>
+    </div>
+    <div class="schedule-card">
+      <div class="schedule-card-top">
+        <div class="schedule-time">Friday · 5:00 PM</div>
+        <div class="schedule-name">✅ Week Wrap-Up</div>
+      </div>
+      <div class="schedule-card-body">
+        Posted to <strong>#oakley-operational-tasks</strong> and each <strong>#[name]-tasks</strong> channel. Shows completed tasks (✓) and what's still open.
+      </div>
+    </div>
+  </div>
+
+  <p style="font-size:14px;color:#718096;margin:24px 0 10px;"><strong style="color:#0F2942;">Digest formats differ by person:</strong></p>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div class="digest-preview">
+      <div class="d-header">☀️ Good morning Izzy — Thursday, April 23</div>
+      <div class="d-project">📁 MargO</div>
+      <div class="d-task-urgent">&nbsp;&nbsp;🔴 Fix security integration</div>
+      <div class="d-task-high">&nbsp;&nbsp;🟠 Update waiver flow</div>
+      <div class="d-project">📁 Bid Automated Reminders</div>
+      <div class="d-task-high">&nbsp;&nbsp;🟠 Set up automation interface</div>
+      <div class="d-task-med">&nbsp;&nbsp;🟡 Write test cases</div>
+      <div class="d-project">📁 No Project</div>
+      <div class="d-task-low">&nbsp;&nbsp;⚪ Review API docs</div>
+      <div class="d-footer">5 open Tech &amp; Innovation tasks — reply to me to manage your list.</div>
+    </div>
+    <div class="digest-preview">
+      <div class="d-header">☀️ Good morning Dan — Thursday, April 23</div>
+      <div class="d-cat">🏗 Permits</div>
+      <div class="d-task-urgent">&nbsp;&nbsp;🔴 Follow up Henderson permit</div>
+      <div class="d-task-high">&nbsp;&nbsp;🟠 Submit 14 Oak permit</div>
+      <div class="d-cat">🔧 Subcontractors</div>
+      <div class="d-task-high">&nbsp;&nbsp;🟠 Call framing sub</div>
+      <div class="d-task-med">&nbsp;&nbsp;🟡 Review electrician bid</div>
+      <div class="d-cat">📦 Materials</div>
+      <div class="d-task-low">&nbsp;&nbsp;⚪ Order window hardware</div>
+      <div class="d-footer">5 open Operational tasks — reply to me to manage your list.</div>
+    </div>
+  </div>
+
+
+  <!-- ─── 8. Tips ─── -->
+  <div class="section-divider">
+    <span class="section-num">08</span>
+    <h2 class="section-title">Tips for Best Results</h2>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="tips-grid">
+    <div class="tip-card">
+      <span class="tip-icon">🎯</span>
+      <div>
+        <div class="tip-title">Be specific about who the task is for</div>
+        <div class="tip-text">If you post "follow up with the framing sub" without naming a person, the bot assigns it to you. Say "Dan needs to follow up with the framing sub" to assign it to Dan.</div>
+      </div>
+    </div>
+    <div class="tip-card">
+      <span class="tip-icon">🚨</span>
+      <div>
+        <div class="tip-title">Urgency words set the priority</div>
+        <div class="tip-text"><strong>Urgent:</strong> ASAP, today, urgent, critical<br><strong>High:</strong> this week, soon, follow up, need to<br><strong>Default:</strong> Medium, if nothing is mentioned</div>
+      </div>
+    </div>
+    <div class="tip-card">
+      <span class="tip-icon">🔗</span>
+      <div>
+        <div class="tip-title">Projects link automatically</div>
+        <div class="tip-text">For Izzy's tasks, the AI infers the project from context. For Dan's tasks, mention the job address or project name explicitly — "Henderson build", "14 Oak St".</div>
+      </div>
+    </div>
+    <div class="tip-card">
+      <span class="tip-icon">📎</span>
+      <div>
+        <div class="tip-title">Each action item becomes its own record</div>
+        <div class="tip-text">Post a message with five action items and the bot creates five separate Airtable records. Each can be tracked, reassigned, and completed independently.</div>
+      </div>
+    </div>
+    <div class="tip-card">
+      <span class="tip-icon">✏️</span>
+      <div>
+        <div class="tip-title">You can always edit in Airtable</div>
+        <div class="tip-text">The bot logs everything but doesn't lock anything. If a task needs a different project, category, or any other field, open Airtable and edit it directly.</div>
+      </div>
+    </div>
+    <div class="tip-card">
+      <span class="tip-icon">👀</span>
+      <div>
+        <div class="tip-title">Always check the thread reply</div>
+        <div class="tip-text">After TaskMate processes your message, it replies in-thread confirming exactly what was logged. If something looks wrong, check the reply before assuming it was captured.</div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ─── 9. Limitations ─── -->
+  <div class="section-divider">
+    <span class="section-num">09</span>
+    <h2 class="section-title">What TaskMate Can't Do</h2>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="callout callout-red">
+    <span class="callout-icon">🚫</span>
+    <div class="callout-body">
+      <div class="callout-title">Private 1:1 DMs between two people</div>
+      <div class="callout-text">Slack doesn't allow bots in private 1:1 conversations. Use a group DM that includes TaskMate, or post in a channel.</div>
+    </div>
+  </div>
+  <div class="callout callout-red" style="margin-top:12px;">
+    <span class="callout-icon">🚫</span>
+    <div class="callout-body">
+      <div class="callout-title">Creating new projects</div>
+      <div class="callout-text">TaskMate can link tasks to existing projects in Airtable but won't create new Project or Tech Project records. If a task doesn't link to a project automatically, set it in Airtable manually.</div>
+    </div>
+  </div>
+  <div class="callout callout-red" style="margin-top:12px;">
+    <span class="callout-icon">🚫</span>
+    <div class="callout-body">
+      <div class="callout-title">Channels it hasn't been invited to</div>
+      <div class="callout-text">Type <code>/invite @TaskMate</code> in any channel to add it. It won't pick up tasks from channels it isn't a member of.</div>
+    </div>
+  </div>
+
+
+  <!-- ─── 10. Quick Reference ─── -->
+  <div class="section-divider">
+    <span class="section-num">10</span>
+    <h2 class="section-title">Quick Reference</h2>
+    <div class="section-line"></div>
+  </div>
+
+  <table class="qr-table">
+    <thead>
+      <tr>
+        <th>What you want to do</th>
+        <th>What to type / do</th>
+        <th>Where</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="row-group"><td colspan="3">Logging Tasks</td></tr>
+      <tr>
+        <td>Log tasks from a message</td>
+        <td>Just post it — bot picks it up automatically</td>
+        <td>Any channel or DM</td>
+      </tr>
+      <tr>
+        <td>Log tasks from a photo</td>
+        <td>Upload the photo to Slack</td>
+        <td>Any channel</td>
+      </tr>
+      <tr>
+        <td>Add a single task manually</td>
+        <td><code>add task: [description]</code></td>
+        <td>Channel or DM</td>
+      </tr>
+      <tr class="row-group"><td colspan="3">Viewing Tasks</td></tr>
+      <tr>
+        <td>See your open tasks</td>
+        <td><code>@TaskMate what's my list</code></td>
+        <td>Channel or DM</td>
+      </tr>
+      <tr>
+        <td>See someone else's tasks</td>
+        <td><code>@TaskMate what's Dan working on</code></td>
+        <td>Channel</td>
+      </tr>
+      <tr>
+        <td>See all team tasks</td>
+        <td><code>@TaskMate show all open tasks</code></td>
+        <td>Channel</td>
+      </tr>
+      <tr>
+        <td>See completed this week</td>
+        <td><code>@TaskMate show completed</code></td>
+        <td>Channel or DM</td>
+      </tr>
+      <tr class="row-group"><td colspan="3">Updating Tasks</td></tr>
+      <tr>
+        <td>Mark something done</td>
+        <td><code>@TaskMate mark [task] as done</code></td>
+        <td>Channel or DM</td>
+      </tr>
+      <tr>
+        <td>Change priority</td>
+        <td><code>@TaskMate set [task] to urgent</code></td>
+        <td>Channel or DM</td>
+      </tr>
+      <tr>
+        <td>Reassign a task</td>
+        <td><code>@TaskMate assign [task] to Dan</code></td>
+        <td>Channel or DM</td>
+      </tr>
+      <tr>
+        <td>Add a note to an Operational task</td>
+        <td><code>@TaskMate add note to [task]: [text]</code></td>
+        <td>Channel or DM</td>
+      </tr>
+      <tr>
+        <td>Add a solution to a Tech task</td>
+        <td><code>@TaskMate add solution to [task]: [text]</code></td>
+        <td>Channel or DM</td>
+      </tr>
+      <tr class="row-group"><td colspan="3">Other</td></tr>
+      <tr>
+        <td>Scan a channel for tasks</td>
+        <td><code>@TaskMate scan #channel-name</code></td>
+        <td>Channel</td>
+      </tr>
+      <tr>
+        <td>Get help</td>
+        <td><code>@TaskMate help</code></td>
+        <td>Channel or DM</td>
+      </tr>
+      <tr>
+        <td>Invite TaskMate to a channel</td>
+        <td><code>/invite @TaskMate</code></td>
+        <td>Any channel</td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <!-- ─── Troubleshooting ─── -->
+  <div class="section-divider">
+    <span class="section-num">11</span>
+    <h2 class="section-title">Troubleshooting</h2>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="callout callout-blue" style="margin-bottom:12px;">
+    <span class="callout-icon">⚠️</span>
+    <div class="callout-body">
+      <div class="callout-title">"Something went wrong" message</div>
+      <div class="callout-text">Try posting again. If it keeps failing, log the task directly in Airtable and let Izzy know so she can check the logs.</div>
+    </div>
+  </div>
+  <div class="callout callout-blue" style="margin-bottom:12px;">
+    <span class="callout-icon">📭</span>
+    <div class="callout-body">
+      <div class="callout-title">Not receiving morning DMs</div>
+      <div class="callout-text">Make sure you've opened a DM with TaskMate at least once (Slack requires you to initiate). Click TaskMate in the Apps sidebar and send it a message.</div>
+    </div>
+  </div>
+  <div class="callout callout-blue" style="margin-bottom:12px;">
+    <span class="callout-icon">🔍</span>
+    <div class="callout-body">
+      <div class="callout-title">Task not linked to a project</div>
+      <div class="callout-text">For Izzy's tasks, the AI links by context — if the match isn't obvious, name the project explicitly. For Dan's tasks, always mention the job address or project name. You can also set the project directly in Airtable.</div>
+    </div>
+  </div>
+  <div class="callout callout-blue">
+    <span class="callout-icon">👻</span>
+    <div class="callout-body">
+      <div class="callout-title">Bot not responding in a channel</div>
+      <div class="callout-text">Type <code>/invite @TaskMate</code> to add it. If it's already there, check that the channel is public or that TaskMate has been properly invited to the private channel.</div>
+    </div>
+  </div>
+
+</div><!-- end .page -->
+
+<footer>
+  <strong>TaskMate</strong> · Oakley Home Builders Internal Tool<br>
+  Questions or issues? Contact <strong>Izzy</strong> · Built with Anthropic Claude + Netlify + Airtable
+</footer>
+
+</body>
+</html>
