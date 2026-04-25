@@ -4,7 +4,7 @@ require('dotenv').config();
 
 const { schedule } = require('@netlify/functions');
 const { getAllOpenOperationalTasks, getAllOpenTechTasks, isIzzy } = require('../../src/services/airtable');
-const { postMessage, getUserIdByEmail, openDirectMessage } = require('../../src/services/slack');
+const { postMessage } = require('../../src/services/slack');
 const { getPersonalTaskChannels } = require('../../src/utils/channelMap');
 const { groupTasksByAssignee, buildPersonalTaskBlocks } = require('../../src/utils/taskParser');
 const { isSteve } = require('../../src/utils/userMap');
@@ -18,41 +18,6 @@ function formatDate(date) {
 
 function capitalize(str) {
   return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
-}
-
-// ─── Central channel digest ───────────────────────────────────────────────────
-
-async function postCentralDigest(grouped, dateStr) {
-  const channel = process.env.CENTRAL_CHANNEL_ID;
-  if (!channel) {
-    console.error('CENTRAL_CHANNEL_ID not set - skipping central Monday digest');
-    return;
-  }
-
-  const totalTasks = Object.values(grouped).reduce((sum, tasks) => sum + tasks.length, 0);
-
-  const blocks = [
-    {
-      type: 'header',
-      text: { type: 'plain_text', text: `Week of ${dateStr} - Team Task Overview`, emoji: true },
-    },
-    { type: 'divider' },
-  ];
-
-  for (const [email, tasks] of Object.entries(grouped)) {
-    if (email === 'Unassigned' || isSteve(email)) continue;
-    const displayName = capitalize(email.split('@')[0]);
-    const label = isIzzy(email) ? 'Tech & Innovation' : 'Operations';
-    blocks.push({
-      type: 'section',
-      text: { type: 'mrkdwn', text: `*${displayName} — ${label} (${tasks.length} task${tasks.length !== 1 ? 's' : ''})*` },
-    });
-    blocks.push(...buildPersonalTaskBlocks(tasks, email));
-    blocks.push({ type: 'divider' });
-  }
-
-  await postMessage(channel, `Week of ${dateStr} - Team Task Overview`, { blocks });
-  console.log(`Monday central digest posted: ${totalTasks} tasks`);
 }
 
 // ─── Personal channel digests ─────────────────────────────────────────────────
@@ -112,10 +77,7 @@ async function runMondayDigest() {
   const dateStr = formatDate(today);
   const grouped = groupTasksByAssignee(allTasks);
 
-  await Promise.all([
-    postCentralDigest(grouped, dateStr),
-    postPersonalChannelDigests(grouped, dateStr),
-  ]);
+  await postPersonalChannelDigests(grouped, dateStr);
 }
 
 // Monday at 8:00 AM EST / 9:00 AM EDT

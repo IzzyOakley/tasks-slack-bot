@@ -3,10 +3,7 @@
 require('dotenv').config();
 
 const { schedule } = require('@netlify/functions');
-const {
-  getAllOpenOperationalTasks, getAllOpenTechTasks,
-  getCompletedThisWeekAll, isIzzy,
-} = require('../../src/services/airtable');
+const { getAllOpenOperationalTasks, getAllOpenTechTasks, getCompletedThisWeekAll, isIzzy } = require('../../src/services/airtable');
 const { rewriteTasksForReport } = require('../../src/services/claude');
 const { postMessage } = require('../../src/services/slack');
 const { getPersonalTaskChannels } = require('../../src/utils/channelMap');
@@ -31,62 +28,6 @@ function getMondayDate() {
 
 function capitalize(str) {
   return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
-}
-
-// ─── Central Friday summary ───────────────────────────────────────────────────
-
-async function postCentralFridaySummary(completedGrouped, openGrouped, weekLabel) {
-  const channel = process.env.CENTRAL_CHANNEL_ID;
-  if (!channel) {
-    console.error('CENTRAL_CHANNEL_ID not set - skipping central Friday summary');
-    return;
-  }
-
-  const allEmails = new Set([...Object.keys(completedGrouped), ...Object.keys(openGrouped)]);
-
-  const blocks = [
-    {
-      type: 'header',
-      text: { type: 'plain_text', text: `Week of ${weekLabel} - What Got Done`, emoji: true },
-    },
-    { type: 'divider' },
-  ];
-
-  let totalCompletedCount = 0;
-
-  for (const email of allEmails) {
-    if (email === 'Unassigned' || isSteve(email)) continue;
-    const name = capitalize(email.split('@')[0]);
-    const label = isIzzy(email) ? 'Tech & Innovation' : 'Operations';
-    const completed = completedGrouped[email] || [];
-    const open = openGrouped[email] || [];
-
-    if (completed.length) {
-      totalCompletedCount += completed.length;
-      blocks.push({
-        type: 'section',
-        text: { type: 'mrkdwn', text: `*${name} completed ${completed.length} ${label} task${completed.length !== 1 ? 's' : ''}*` },
-      });
-      blocks.push(...buildPersonalTaskBlocks(completed.map((t) => ({ ...t, taskName: `${t.taskName} ✓` })), email));
-    }
-
-    if (open.length) {
-      blocks.push({
-        type: 'context',
-        elements: [{
-          type: 'mrkdwn',
-          text: `Still open for ${name}: ${open.length} ${label} task${open.length !== 1 ? 's' : ''}`,
-        }],
-      });
-    }
-
-    if (completed.length || open.length) {
-      blocks.push({ type: 'divider' });
-    }
-  }
-
-  await postMessage(channel, `Week of ${weekLabel} - End of Week Summary`, { blocks });
-  console.log(`Friday central summary posted (${totalCompletedCount} completed)`);
 }
 
 // ─── Personal channel Friday summaries ───────────────────────────────────────
@@ -164,10 +105,7 @@ async function runFridayDigest() {
   const completedGrouped = groupTasksByAssignee(applyRewrites(completedTasks));
   const openGrouped = groupTasksByAssignee(applyRewrites(allOpenTasks));
 
-  await Promise.all([
-    postCentralFridaySummary(completedGrouped, openGrouped, weekLabel),
-    postPersonalFridaySummaries(completedGrouped, openGrouped, weekLabel),
-  ]);
+  await postPersonalFridaySummaries(completedGrouped, openGrouped, weekLabel);
 }
 
 // Friday at 5:00 PM EDT (9:00 PM UTC)
