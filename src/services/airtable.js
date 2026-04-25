@@ -112,10 +112,9 @@ async function getAllOpenTasks() {
 }
 
 async function getCompletedThisWeek(tableKey) {
-  const mondayStr = getMondayOfCurrentWeek();
   const table = tableKey === 'tech' ? TECH_TABLE : OPERATIONAL_TABLE;
   const records = await getBase()(table)
-    .select({ filterByFormula: `AND(IS_AFTER({Date Completed}, "${mondayStr}"), {Status} = "Done")` })
+    .select({ filterByFormula: `{Status} = "Done"` })
     .all();
   const tasks = records.map((r) => formatTaskRecord(r, table));
   if (table === TECH_TABLE) return enrichTechTasksWithProjectNames(tasks);
@@ -210,15 +209,6 @@ function formatTaskRecord(record, table) {
   };
 }
 
-function getMondayOfCurrentWeek() {
-  const now = new Date();
-  const day = now.getUTCDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  const monday = new Date(now);
-  monday.setUTCDate(now.getUTCDate() + diff);
-  monday.setUTCHours(0, 0, 0, 0);
-  return monday.toISOString().split('T')[0];
-}
 
 function sortByPriority(a, b) {
   const pa = PRIORITY_ORDER[a.priority] ?? 99;
