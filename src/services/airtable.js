@@ -112,13 +112,27 @@ async function getAllOpenTasks() {
 }
 
 async function getCompletedThisWeek(tableKey) {
+  const mondayStr = getMondayOfCurrentWeek();
   const table = tableKey === 'tech' ? TECH_TABLE : OPERATIONAL_TABLE;
+  // Include Done tasks completed this week, plus Done tasks with no completion date
+  // (covers tasks manually marked Done in Airtable without filling in Date Completed)
+  const formula = `AND({Status} = "Done", OR(IS_AFTER({Date Completed}, "${mondayStr}"), NOT({Date Completed})))`;
   const records = await getBase()(table)
-    .select({ filterByFormula: `{Status} = "Done"` })
+    .select({ filterByFormula: formula })
     .all();
   const tasks = records.map((r) => formatTaskRecord(r, table));
   if (table === TECH_TABLE) return enrichTechTasksWithProjectNames(tasks);
   return tasks;
+}
+
+function getMondayOfCurrentWeek() {
+  const now = new Date();
+  const day = now.getUTCDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now);
+  monday.setUTCDate(now.getUTCDate() + diff);
+  monday.setUTCHours(0, 0, 0, 0);
+  return monday.toISOString().split('T')[0];
 }
 
 async function getCompletedThisWeekAll() {

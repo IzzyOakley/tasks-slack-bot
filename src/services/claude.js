@@ -273,7 +273,10 @@ Return ONLY valid JSON array: [{ "id": "...", "rewritten": "..." }]`;
       system,
       messages: [{ role: 'user', content: JSON.stringify(items) }],
     });
-    const result = JSON.parse(response.content[0].text.trim());
+    let raw = response.content[0].text.trim();
+    // Strip markdown code fences if Claude wraps the response
+    raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+    const result = JSON.parse(raw);
     return new Map(result.map((r) => [r.id, r.rewritten]));
   } catch (err) {
     console.error('rewriteTasksForReport failed:', err.message);
