@@ -8,7 +8,7 @@ const { rewriteTasksForReport } = require('../../src/services/claude');
 const { postMessage } = require('../../src/services/slack');
 const { getPersonalTaskChannels } = require('../../src/utils/channelMap');
 const { groupTasksByAssignee, buildPersonalTaskBlocks } = require('../../src/utils/taskParser');
-const { isSteve } = require('../../src/utils/userMap');
+const { isSteve, resolveUserByDisplayName } = require('../../src/utils/userMap');
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -37,10 +37,8 @@ async function postPersonalFridaySummaries(completedGrouped, openGrouped, weekLa
 
   for (const ch of personalChannels) {
     const ownerName = ch.ownerFirstName;
-    const allEmails = new Set([...Object.keys(completedGrouped), ...Object.keys(openGrouped)]);
-    const ownerEmail = [...allEmails].find(
-      (e) => e.split('@')[0].toLowerCase() === ownerName.toLowerCase()
-    );
+    const resolved = await resolveUserByDisplayName(ownerName);
+    const ownerEmail = resolved ? resolved.email : null;
 
     const completed = ownerEmail ? (completedGrouped[ownerEmail] || []) : [];
     const open = ownerEmail ? (openGrouped[ownerEmail] || []) : [];
