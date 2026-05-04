@@ -5,7 +5,7 @@ require('dotenv').config();
 const crypto = require('crypto');
 const qs = require('querystring');
 
-const { getTasksByAssignee } = require('../../src/services/airtable');
+const { getTasksByAssignee, findTaskByName, updateTask } = require('../../src/services/airtable');
 const { resolveUserEmail } = require('../../src/utils/userMap');
 const { buildPersonalTaskBlocks } = require('../../src/utils/taskParser');
 
@@ -55,9 +55,10 @@ exports.handler = async (event) => {
   }
 
   const body = qs.parse(rawBody);
-  const { command, user_id } = body;
+  const { command, user_id, text } = body;
+  const taskQuery = (text || '').trim();
 
-  console.log('SLASH-COMMAND:', command, 'user:', user_id);
+  console.log('SLASH-COMMAND:', command, 'user:', user_id, 'text:', taskQuery);
 
   let userEmail;
   try {
@@ -70,6 +71,37 @@ exports.handler = async (event) => {
     return ephemeral('⚠️ Could not resolve your Slack account. Make sure your email is set in your Slack profile.');
   }
 
+  // ── /done [task] ──────────────────────────────────────────────────────────
+  if (command === '/done') {
+    if (!taskQuery) return ephemeral('Usage: `/done [part of task name]`');
+    let task;
+    try {
+      task = await findTaskByName(taskQuery, userEmail);
+    } catch (err) {
+      console.error('findTaskByName failed:', err.message);
+      return ephemeral('⚠️ Could not search tasks. Please try again.');
+    }
+    if (!task) return ephemeral(`⚠️ No open task found matching "${taskQuery}".`);
+    await updateTask(task.id, { status: 'Done', dateCompleted: new Date().toISOString().split('T')[0] }, task.table);
+    return ephemeral(`✅ Marked done: *${task.taskName}*`);
+  }
+
+  // ── /seturgent [task] ─────────────────────────────────────────────────────
+  if (command === '/seturgent') {
+    if (!taskQuery) return ephemeral('Usage: `/seturgent [part of task name]`');
+    let task;
+    try {
+      task = await findTaskByName(taskQuery, userEmail);
+    } catch (err) {
+      console.error('findTaskByName failed:', err.message);
+      return ephemeral('⚠️ Could not search tasks. Please try again.');
+    }
+    if (!task) return ephemeral(`⚠️ No open task found matching "${taskQuery}".`);
+    await updateTask(task.id, { priority: 'Urgent' }, task.table);
+    return ephemeral(`🔴 Set to urgent: *${task.taskName}*`);
+  }
+
+  // ── list commands (/mylist, /inprogress, /urgent) ─────────────────────────
   let tasks;
   try {
     tasks = await getTasksByAssignee(userEmail);
