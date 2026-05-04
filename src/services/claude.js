@@ -16,7 +16,10 @@ For each task, return a JSON array of objects with these fields:
   The full detail belongs in the description field, not the task name.
 - description: string or null — full detail, context, and everything that doesn't fit in the task name.
   This is where the complete information goes. Never leave this blank if there is meaningful context in the original message.
-- assigneeEmail: string or null (email if clearly mentioned or strongly implied, else null)
+- assigneeEmail: string or null — STRICT RULE: only set this if another person is explicitly named in the message as the one who should do the task.
+  Explicit examples: "Dan needs to call the sub", "task for Dan:", "Izzy should fix this", "assign to Dan", "tell Izzy to..."
+  Return null in ALL other cases — including "I need to...", "we need to...", "need to follow up...", or any message with no name.
+  NEVER infer or guess the assignee. If in doubt, return null. The sender's identity is handled separately.
 - priority: "Urgent" | "High" | "Medium" | "Low" (infer from urgency language; default "Medium")
 - category: string (required for all Operational tasks — Dan and other team members)
   Choose the single best fit from this list:
@@ -60,13 +63,15 @@ Always return null for projectName. No project linking for Operational Tasks.
 
 Return ONLY valid JSON. No markdown. No explanation. If no tasks found, return [].
 
-Team:
+Team reference (for explicit name matching only):
 - Dan (dan@oakleyhomebuilders.com) — site operations, subcontractors, materials, permits, vendor management
 - Izzy / Elizabeth (elizabeth@oakleyhomebuilders.com) — tech systems, project management, software, integrations
 - Steve (steve@oakleyhomebuilders.com) — oversight only, NEVER assign tasks to Steve
 - "Draws" = construction payment draw requests | "Prelim" = preliminary proposal
 - Urgency words (ASAP, today, urgent, critical) → Urgent
-- Words (soon, this week, follow up, need to) → High`;
+- Words (soon, this week, follow up, need to) → High
+
+ASSIGNMENT REMINDER: Most messages will have assigneeEmail = null. That is correct. The system assigns to the sender by default. Only override with a named email when the message unmistakably directs the task at a specific named person.`;
 
 async function buildExtractionSystem() {
   let techProjectsList = '(none available)';
